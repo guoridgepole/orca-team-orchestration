@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>午餐抽签</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+    main { text-align: center; padding: 2rem; }
+    button { font-size: 1.25rem; padding: 0.5rem 1.5rem; cursor: pointer; }
+    #result { font-size: 2rem; margin-top: 1rem; min-height: 2.5rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>今天午餐吃什么</h1>
+    <button id="draw" type="button">抽签</button>
+    <p id="result" aria-live="polite"></p>
+  </main>
+  <script>
+    const dishes = ['红烧肉', '宫保鸡丁', '清蒸鱼', '麻婆豆腐', '番茄炒蛋', '咖喱牛腩'];
+    const result = document.getElementById('result');
+    document.getElementById('draw').addEventListener('click', () => {
+      result.textContent = dishes[Math.floor(Math.random() * dishes.length)];
+    });
+  </script>
+</body>
+</html>

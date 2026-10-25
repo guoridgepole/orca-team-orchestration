@@ -1,0 +1,123 @@
+version: 1
+locale: zh-CN
+project:
+  name: todo-app
+  commands:
+    start: npm run dev
+    test: npm test
+    build: npm run build
+    base_url: http://127.0.0.1:3000/
+  paths:
+    features_dir: features
+    docs: docs
+    source:
+      - src/
+    tests:
+      - test/
+    db: db/update.sql
+    evidence: docs/test/evidence
+runtime:
+  orchestrator: orca
+  shell: auto
+  timeout_minutes: 30
+  max_rounds:
+    design_review: 3
+    dev_test: 3
+  checkpoint_commits: true
+  push: false
+  worktree: path:.
+agents:
+  claude-main:
+    kind: claude
+    model: null
+    effort: medium
+  codex-review:
+    kind: codex
+    model: null
+roles:
+  designer:
+    agent: claude-main
+    writes:
+      - docs/design/
+    artifact:
+      path: docs/design/{{story}}-r{{round}}.md
+      template: designer
+      required_sections:
+        - 目标
+        - 验收映射
+        - 数据库变更
+        - 失败路径
+        - 回滚
+  reviewer:
+    agent: codex-review
+    writes:
+      - docs/review/
+    readonly_source: true
+    artifact:
+      path: docs/review/{{story}}-r{{round}}.md
+      template: reviewer
+      required_sections:
+        - 问题清单
+        - 通过条件
+      first_line:
+        - PASS
+        - REJECT
+  developer:
+    agent: claude-main
+    writes:
+      - docs/dev/
+    artifact:
+      path: docs/dev/{{story}}-r{{round}}.md
+      template: developer
+      required_sections:
+        - 变更
+        - 自测
+        - SQL
+    run_checks:
+      - project-test
+  tester:
+    agent: codex-review
+    writes:
+      - docs/test/
+    artifact:
+      path: docs/test/{{story}}-r{{round}}.md
+      template: tester
+      required_sections:
+        - 用例结果
+        - 证据
+      first_line:
+        - PASS
+        - FAIL
+    browser:
+      driver: orca
+      url: "{{project.commands.base_url}}"
+flow:
+  design: designer
+  review:
+    - reviewer
+  develop: developer
+  test:
+    - tester
+  accept: coordinator
+guards:
+  - id: sql-append-only
+    type: append-only
+    paths:
+      - db/update.sql
+    require_header: "-- migration:"
+    message: "SQL 只能追加到文件末尾，且每段以 -- migration: 开头"
+  - id: no-delete-schema
+    type: no-delete
+    paths:
+      - db/**
+    message: 禁止删除数据库相关文件或语句
+  - id: config-immutable
+    type: immutable
+    paths:
+      - package.json
+    message: 依赖与脚本变更需要协调者审批
+checks:
+  project-test:
+    command: "{{project.commands.test}}"
+    timeout_minutes: 15
+    required: true

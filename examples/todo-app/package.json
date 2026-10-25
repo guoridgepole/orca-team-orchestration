@@ -1,0 +1,11 @@
+{
+  "name": "todo-app-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.js",
+    "test": "node --test test/todo.test.js",
+    "build": "node --check src/store.js && node --check src/server.js"
+  }
+}

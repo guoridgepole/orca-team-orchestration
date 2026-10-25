@@ -1,0 +1,104 @@
+version: 1
+locale: zh-CN
+project:
+  name: static-site
+  commands:
+    start: cd public && python3 -m http.server 5180 --bind 127.0.0.1
+    test: null
+    build: null
+    base_url: http://127.0.0.1:5180/
+  paths:
+    features_dir: features
+    docs: docs
+    source:
+      - public/
+    tests: []
+    db: null
+    evidence: docs/test/evidence
+runtime:
+  orchestrator: orca
+  shell: auto
+  timeout_minutes: 30
+  max_rounds:
+    design_review: 3
+    dev_test: 3
+  checkpoint_commits: true
+  push: false
+  worktree: path:.
+agents:
+  claude-main:
+    kind: claude
+    model: null
+    effort: medium
+  codex-review:
+    kind: codex
+    model: null
+roles:
+  designer:
+    agent: claude-main
+    writes:
+      - docs/design/
+    artifact:
+      path: docs/design/{{story}}-r{{round}}.md
+      template: designer
+      required_sections:
+        - 目标
+        - 验收映射
+        - 数据库变更
+        - 失败路径
+        - 回滚
+  reviewer:
+    agent: codex-review
+    writes:
+      - docs/review/
+    readonly_source: true
+    artifact:
+      path: docs/review/{{story}}-r{{round}}.md
+      template: reviewer
+      required_sections:
+        - 问题清单
+        - 通过条件
+      first_line:
+        - PASS
+        - REJECT
+  developer:
+    agent: claude-main
+    writes:
+      - docs/dev/
+    artifact:
+      path: docs/dev/{{story}}-r{{round}}.md
+      template: developer
+      required_sections:
+        - 变更
+        - 自测
+        - SQL
+  tester:
+    agent: codex-review
+    writes:
+      - docs/test/
+    artifact:
+      path: docs/test/{{story}}-r{{round}}.md
+      template: tester
+      required_sections:
+        - 用例结果
+        - 证据
+      first_line:
+        - PASS
+        - FAIL
+    browser:
+      driver: orca
+      url: "{{project.commands.base_url}}"
+flow:
+  design: designer
+  review:
+    - reviewer
+  develop: developer
+  test:
+    - tester
+  accept: coordinator
+guards: []
+checks:
+  project-test:
+    command: "{{project.commands.test}}"
+    timeout_minutes: 15
+    required: true

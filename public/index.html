@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="orca-team-orchestration 本地工作台，查看项目状态并编辑角色提示词。"
+    />
+    <title>Orca Team Orchestration</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="返回首页">
+        <span class="brand-mark" aria-hidden="true">O</span>
+        <span>
+          <strong>Orca Team</strong>
+          <small>Orchestration Console</small>
+        </span>
+      </a>
+      <span class="status" id="server-status">
+        <span class="status-dot" aria-hidden="true"></span>
+        正在连接本地服务
+      </span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">LOCAL DEVELOPMENT CONSOLE</p>
+        <h1>角色提示词工作台</h1>
+        <p class="lede">
+          为方案设计、方案审核、研发、测试等角色配置行为契约、绑定各自独立的执行 Agent，
+          并保留设计⇄审核、开发⇄测试的轮次上限。
+          提示词会写入项目的覆盖文件，可用 <code>render</code> 查看最终渲染结果。
+        </p>
+        <div class="hero-actions">
+          <a class="primary" href="#roles">编辑角色提示词</a>
+          <a class="secondary" href="#commands">查看常用命令</a>
+        </div>
+      </section>
+
+      <section class="grid" aria-label="项目概览">
+        <article class="card project-card" id="project">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">CURRENT PROJECT</p>
+              <h2 id="project-name">读取中…</h2>
+            </div>
+            <span class="tag" id="config-tag">检查配置</span>
+          </div>
+          <dl>
+            <div>
+              <dt>项目目录</dt>
+              <dd id="project-root">—</dd>
+            </div>
+            <div>
+              <dt>启动命令</dt>
+              <dd><code id="start-command">—</code></dd>
+            </div>
+            <div>
+              <dt>测试命令</dt>
+              <dd><code id="test-command">—</code></dd>
+            </div>
+            <div>
+              <dt>页面基址</dt>
+              <dd><a id="base-url" href="http://127.0.0.1:5173/">—</a></dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="card readiness-card">
+          <p class="eyebrow">READINESS</p>
+          <h2>运行依赖</h2>
+          <ul class="checks">
+            <li>
+              <span class="check-icon ok" aria-hidden="true">✓</span>
+              本地页面服务
+              <small id="server-check">连接中</small>
+            </li>
+            <li>
+              <span class="check-icon" id="orca-icon" aria-hidden="true">…</span>
+              Orca CLI
+              <small id="orca-check">检查中</small>
+            </li>
+            <li>
+              <span class="check-icon" id="config-icon" aria-hidden="true">…</span>
+              项目配置
+              <small id="config-check">检查中</small>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="card roles-card" id="roles">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">ROLE PROMPTS</p>
+            <h2>角色提示词</h2>
+          </div>
+          <span class="tag" id="roles-state">读取中</span>
+        </div>
+        <p class="hint">
+          保存只写入 <code>.orca-team-orchestration/roles/&lt;role&gt;.md</code> 与
+          <code>config.yaml</code>（轮次上限、角色 Agent 绑定、agents 定义），不会执行任何命令。恢复默认会删除对应覆盖文件；覆盖前会保留
+          <code>.bak</code> 备份。项目命令与路径请直接修改 YAML 或使用 CLI。
+        </p>
+
+        <div class="roles-layout">
+          <div class="roles-sidebar">
+            <div class="role-tabs" id="role-tabs" role="tablist" aria-label="角色列表"></div>
+
+            <fieldset class="rounds-panel">
+              <legend>循环轮次上限</legend>
+              <label class="field">
+                <span>设计 ⇄ 审核</span>
+                <input id="round-design-review" type="number" min="1" max="100" step="1" />
+              </label>
+              <label class="field">
+                <span>开发 ⇄ 测试</span>
+                <input id="round-dev-test" type="number" min="1" max="100" step="1" />
+              </label>
+              <p class="hint">超过上限会转人工 gate，不会自动继续。</p>
+            </fieldset>
+
+            <fieldset class="agents-panel">
+              <legend>Agent 池</legend>
+              <div class="agents-list" id="agents-list"></div>
+              <div class="agent-add">
+                <input id="agent-new-name" type="text" placeholder="新 agent 名称" spellcheck="false" />
+                <select id="agent-new-kind" aria-label="新 agent 类型"></select>
+                <button class="secondary button" id="agent-add" type="button">添加</button>
+              </div>
+              <p class="hint">修改 agent 定义会影响所有引用它的角色；被角色使用的 agent 不能删除。</p>
+            </fieldset>
+
+            <p class="config-error" id="roles-error" role="alert" aria-live="polite"></p>
+            <div class="config-actions">
+              <button class="primary button" id="roles-save" type="button">保存修改</button>
+              <button class="secondary button" id="roles-reset" type="button">重置</button>
+              <span class="hint" id="roles-revision">—</span>
+            </div>
+          </div>
+
+          <div class="role-editor">
+            <div class="role-editor-head">
+              <div>
+                <h3 id="role-title">—</h3>
+                <p class="hint" id="role-meta">—</p>
+              </div>
+              <span class="tag" id="role-state">—</span>
+            </div>
+
+            <dl class="role-facts" id="role-facts"></dl>
+
+            <label class="field agent-bind">
+              <span>执行 Agent</span>
+              <select id="role-agent"></select>
+            </label>
+
+            <label class="field prompt-field">
+              <span>提示词（Markdown）<span class="hint" id="prompt-count"></span></span>
+              <textarea
+                id="prompt-editor"
+                rows="20"
+                spellcheck="false"
+                placeholder="选择角色后编辑提示词"
+              ></textarea>
+            </label>
+
+            <div class="prompt-actions">
+              <button class="secondary button" id="prompt-restore" type="button">恢复默认</button>
+              <details class="default-details">
+                <summary>查看内置默认</summary>
+                <pre class="yaml-preview" id="default-prompt">—</pre>
+              </details>
+            </div>
+
+            <div class="config-preview-panel save-plan-panel">
+              <div class="preview-heading">
+                <span>保存计划</span>
+                <span class="hint">保存内容以此为准</span>
+              </div>
+              <ul class="save-plan" id="save-plan">
+                <li>读取中…</li>
+              </ul>
+              <p class="hint" id="role-warnings"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card commands-card" id="commands">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">QUICK START</p>
+            <h2>常用命令</h2>
+          </div>
+          <span class="hint">点击命令即可复制</span>
+        </div>
+        <div class="command-list">
+          <button class="command" data-copy="npm run dev">
+            <span>启动本地页面</span>
+            <code>npm run dev</code>
+          </button>
+          <button class="command" data-copy="orca-team-orchestration render designer story-001">
+            <span>查看渲染后的提示词</span>
+            <code>orca-team-orchestration render designer story-001</code>
+          </button>
+          <button class="command" data-copy="orca-team-orchestration status">
+            <span>查看项目状态</span>
+            <code>orca-team-orchestration status</code>
+          </button>
+          <button class="command" data-copy="orca-team-orchestration doctor">
+            <span>检查运行环境</span>
+            <code>orca-team-orchestration doctor</code>
+          </button>
+        </div>
+      </section>
+
+      <aside class="notice">
+        <strong>注意</strong>
+        <p>
+          页面保存不会执行命令，也不会启动真实阶段派发。当前可用
+          <code>orca-team-orchestration render &lt;role&gt; &lt;story&gt;</code>
+          检查某个角色最终会收到的完整提示词；真实 StageRunner 与 Orca 派发仍在后续里程碑。
+        </p>
+      </aside>
+    </main>
+
+    <footer>
+      <span>orca-team-orchestration v0.0.0</span>
+      <span>仅监听本机回环地址</span>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite">操作完成</div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
