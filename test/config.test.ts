@@ -122,8 +122,11 @@ test('writes 过宽报错', () => {
   assert.throws(() => validateConfig(merged), /范围过宽/);
 });
 
-test('start 命令在 requireCommands 时要求 start/test', () => {
-  assert.throws(() => validateConfig(defaults(), { requireCommands: true }), /commands\.start/);
+test('运行命令可以为空，由角色在运行时自行识别', () => {
+  const config = validateConfig(defaults());
+  assert.equal(config.project.commands.start, null);
+  assert.equal(config.project.commands.test, null);
+  assert.equal(config.project.commands.base_url, null);
 });
 
 test('角色名必须能安全用作文件名', () => {

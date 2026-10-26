@@ -141,7 +141,7 @@ project:
 runtime:
   orchestrator: orca           # 默认 orca；auto 也必须检测到 Orca
   shell: auto                  # auto | sh | pwsh | cmd
-  timeout_minutes: 30          # 单个 Dispatch 超时
+  timeout_minutes: 60          # 单个 Dispatch 超时
   max_rounds:
     design_review: 3           # 设计 ⇄ 审核，1–10
     dev_test: 3                # 开发 ⇄ 测试，1–10
@@ -248,7 +248,7 @@ checks:                        # 命名的命令检查，供 run_checks 引用
 
 ### 5.4 校验
 
-- 必填：`version`、`project.commands.start/test`（`accept: none` 时可不填）。
+- 必填：`version`；`project.commands.start/test/base_url` 均可为空，为空时由角色在运行时自行识别并交接。
 - 角色引用的 `agent` 必须存在于 `agents`。
 - `flow` 的五个键必须齐全；值为 `null` 表示跳过该阶段（仅 `review`/`test` 允许跳过）。
 - `writes` 必须是非空 glob；禁止 `**` 或仓库根这种过宽范围（防误配）。
@@ -321,7 +321,7 @@ story id 格式固定为 `story-<版本>-<序号>`：前缀必须是 `story`，�
 
 | 步骤 | 内容 | 预填来源 |
 |---|---|---|
-| 1. 项目 | 名称、启动/测试命令、base_url、源码目录、数据库文件、证据目录 | 探测 + 现有配置 |
+| 1. 项目 | 名称、启动/测试命令、base_url、源码目录、数据库文件、证据目录 | 探测 + 现有配置；缺失时角色运行时自行识别 |
 | 2. 角色 | 增删角色卡：名称、所属阶段、agent 工具、模型、effort、可写目录、产物路径/必填章节/首行判定、只读源码 | 内置四角色 |
 | 3. 轮次 | `design_review` / `dev_test` 上限（1–10）；超限一律转 gate | 3 / 3 |
 | 4. 规则 | 每个角色的提示词 Markdown 编辑器 + 数据库等守则开关 | 内置默认提示词 |

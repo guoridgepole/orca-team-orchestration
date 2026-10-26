@@ -188,7 +188,7 @@ export function builtinDefaults(projectName: string): Config {
     runtime: {
       orchestrator: 'orca',
       shell: 'auto',
-      timeout_minutes: 30,
+      timeout_minutes: 60,
       max_rounds: { design_review: 3, dev_test: 3 },
       checkpoint_commits: true,
       push: false,
@@ -409,10 +409,7 @@ function pathsOverlap(left: string, right: string): boolean {
   return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 
-export function validateConfig(
-  raw: unknown,
-  options: { repoRoot?: string; requireCommands?: boolean } = {},
-): Config {
+export function validateConfig(raw: unknown, options: { repoRoot?: string } = {}): Config {
   const root = asObject(raw, 'config');
   noUnknown(root, TOP_KEYS, 'config');
   if (root.version !== 1) configError('version 必须是 1');
@@ -449,11 +446,6 @@ export function validateConfig(
       asString(commands[key], `project.commands.${key}`);
     }
   }
-  if (options.requireCommands) {
-    if (!commands.start) configError('project.commands.start 不能为空（用 orca-team-orchestration config 补全）');
-    if (!commands.test) configError('project.commands.test 不能为空（用 orca-team-orchestration config 补全）');
-  }
-
   const paths = asObject(project.paths, 'project.paths');
   noUnknown(paths, ['features_dir', 'docs', 'source', 'tests', 'db', 'evidence'], 'project.paths');
   const featuresDir = asString(paths.features_dir, 'project.paths.features_dir');
@@ -614,11 +606,7 @@ export function validateConfig(
   return root as unknown as Config;
 }
 
-function effectiveConfig(
-  repoRoot: string,
-  projectRaw: Record<string, unknown>,
-  options: { requireCommands?: boolean } = {},
-): Config {
+function effectiveConfig(repoRoot: string, projectRaw: Record<string, unknown>): Config {
   let merged = builtinDefaults(path.basename(repoRoot)) as unknown as Record<string, unknown>;
   const globalRaw = readText(globalConfigPath());
   if (globalRaw !== null) {
@@ -631,28 +619,21 @@ function effectiveConfig(
     merged = mergeConfig(merged, globalConfig);
   }
   merged = mergeConfig(merged, projectRaw);
-  return validateConfig(merged, { repoRoot, requireCommands: options.requireCommands });
+  return validateConfig(merged, { repoRoot });
 }
 
-export function loadConfig(
-  repoRoot: string,
-  options: { requireCommands?: boolean } = {},
-): Config {
+export function loadConfig(repoRoot: string): Config {
   const raw = readText(projectConfigPath(repoRoot));
   if (raw === null) {
     throw new CliError(EXIT.config, '未找到 .orca-team-orchestration/config.yaml；先运行 orca-team-orchestration init');
   }
   const projectRaw = parseYamlSafe(raw, projectConfigPath(repoRoot));
-  return effectiveConfig(repoRoot, projectRaw, options);
+  return effectiveConfig(repoRoot, projectRaw);
 }
 
-export function configFromRaw(
-  repoRoot: string,
-  raw: string,
-  options: { requireCommands?: boolean } = {},
-): Config {
+export function configFromRaw(repoRoot: string, raw: string): Config {
   const projectRaw = parseYamlSafe(raw, projectConfigPath(repoRoot));
-  return effectiveConfig(repoRoot, projectRaw, options);
+  return effectiveConfig(repoRoot, projectRaw);
 }
 
 export function readConfigSnapshot(repoRoot: string): ConfigSnapshot {

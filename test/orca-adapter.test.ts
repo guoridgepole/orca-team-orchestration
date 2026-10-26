@@ -130,6 +130,15 @@ describe('Orca adapter', { skip }, () => {
     assert.equal(start[start.length - 1], '--json');
   });
 
+  it('dispatch 透传超过 10 分钟的 timeout', async () => {
+    const a = adapter();
+    await a.dispatch(plan({ timeoutMs: 60 * 60_000 }));
+    const start = loggedArgs()[0];
+    const index = start.indexOf('--timeout-ms');
+    assert.notEqual(index, -1, JSON.stringify(start));
+    assert.equal(start[index + 1], String(60 * 60_000));
+  });
+
   it('dispatch 拒绝不受支持的 agent kind', async () => {
     const a = adapter();
     await assert.rejects(() => a.dispatch(plan({ agent: { kind: 'muse' } })), /Orca 不支持 agent kind/);

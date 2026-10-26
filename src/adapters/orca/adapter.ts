@@ -249,13 +249,13 @@ export class OrcaAdapter implements Orchestrator {
       '--run',
       plan.runId,
       '--timeout-ms',
-      String(Math.min(plan.timeoutMs, 600_000)),
+      String(plan.timeoutMs),
     ];
     if (agent.model) args.push('--model', agent.model);
     if (agent.effort) args.push('--effort', agent.effort);
     if (agent.args?.length) args.push(...agent.args);
     args.push('--json');
-    const json = this.run(args, Math.min(plan.timeoutMs, 600_000) + 60_000);
+    const json = this.run(args, plan.timeoutMs + 60_000);
     return extractDispatchHandle(json, plan.runId);
   }
 

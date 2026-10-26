@@ -208,6 +208,17 @@ function requireFlowAgentsAvailable(config: Config): void {
   for (const kind of kinds) requireAgentAvailable(kind);
 }
 
+function reportRuntimeDiscoveryHint(config: Config): void {
+  const missing = [
+    !config.project.commands.start ? 'start' : null,
+    !config.project.commands.test ? 'test' : null,
+    !config.project.commands.base_url ? 'base_url' : null,
+  ].filter((item): item is string => item !== null);
+  if (missing.length === 0) return;
+  out(`\n运行信息未配置：${missing.join(', ')}`);
+  out('  不配置也可运行：各角色会在运行前自行识别；需要固定时用 orca-team-orchestration config 补全');
+}
+
 async function cmdInit(args: ParsedArgs): Promise<number> {
   if (flagBool(args, 'workspace')) return cmdInitWorkspace(args);
   const root = repoRootFrom(args);
@@ -232,14 +243,7 @@ async function cmdInit(args: ParsedArgs): Promise<number> {
   }
 
   const config = loadConfig(root);
-  const missing: string[] = [];
-  if (!config.project.commands.start) missing.push('start');
-  if (!config.project.commands.test) missing.push('test');
-  if (!config.project.commands.base_url) missing.push('base_url');
-  if (missing.length > 0) {
-    out(`\n待补全：${missing.join(', ')}`);
-    out('  orca-team-orchestration config --start "..." --test "..." --base-url "..."');
-  }
+  reportRuntimeDiscoveryHint(config);
   if (flagBool(args, 'orca-add')) {
     const added = spawnSync(orca, ['repo', 'add', '--path', root, '--json'], { encoding: 'utf8' });
     out(`\nOrca 注册：${added.status === 0 ? 'OK' : 'FAILED'}`);
@@ -282,14 +286,7 @@ async function cmdInitWorkspace(args: ParsedArgs): Promise<number> {
   for (const warning of result.warnings) out(`  warning ${warning}`);
 
   const config = loadConfig(root);
-  const missing: string[] = [];
-  if (!config.project.commands.start) missing.push('start');
-  if (!config.project.commands.test) missing.push('test');
-  if (!config.project.commands.base_url) missing.push('base_url');
-  if (missing.length > 0) {
-    out(`\n待补全：${missing.join(', ')}`);
-    out('  orca-team-orchestration config --start "..." --test "..." --base-url "..."');
-  }
+  reportRuntimeDiscoveryHint(config);
   if (flagBool(args, 'orca-add')) {
     const added = spawnSync(orca, ['repo', 'add', '--path', root, '--json'], { encoding: 'utf8' });
     out(`\nOrca 注册（workspace 根）：${added.status === 0 ? 'OK' : 'FAILED'}`);
@@ -471,7 +468,7 @@ async function pickStory(root: string, config: Config): Promise<string> {
 
 async function cmdStart(args: ParsedArgs): Promise<number> {
   const root = repoRootFrom(args);
-  const config = loadConfig(root, { requireCommands: true });
+  const config = loadConfig(root);
   workspaceLayoutFor(root, config);
   let story = args.positionals[0];
   if (!story) {
@@ -535,7 +532,7 @@ async function cmdStart(args: ParsedArgs): Promise<number> {
 
 async function cmdResume(args: ParsedArgs): Promise<number> {
   const root = repoRootFrom(args);
-  const config = loadConfig(root, { requireCommands: true });
+  const config = loadConfig(root);
   workspaceLayoutFor(root, config);
   const story = requirePositional(args, 0, 'orca-team-orchestration resume <story> [--refresh-spec]');
   const state = readState(root, story);
@@ -1047,8 +1044,11 @@ async function cmdDoctor(args: ParsedArgs): Promise<number> {
     );
     items.push({
       name: '命令',
-      status: missing.length === 0 ? 'OK' : 'WARN',
-      detail: missing.length === 0 ? 'start / test / base_url 已设置' : `缺少 ${missing.join(', ')}`,
+      status: 'OK',
+      detail:
+        missing.length === 0
+          ? 'start / test / base_url 已设置'
+          : `未设置：${missing.join(', ')}（运行时由角色自行识别）`,
     });
 
     const kinds = new Set(Object.values(config.agents).map((agent) => agent.kind));

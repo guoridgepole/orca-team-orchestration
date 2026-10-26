@@ -440,11 +440,11 @@ export function initWorkspace(options: WorkspaceInitOptions): WorkspaceInitResul
 
   if (config.project.commands.start === null) {
     warnings.push(
-      `未自动确定启动命令（候选：${start.join(' / ') || '无'}）；用 config --start 指定`,
+      `未自动确定启动命令（候选：${start.join(' / ') || '无'}）；可留空由角色运行时自行识别，或用 config --start 固定`,
     );
   }
   if (config.project.commands.base_url === null && baseUrls.length > 1) {
-    warnings.push(`检测到多个页面基址（${baseUrls.join(', ')}）；用 config --base-url 指定一个`);
+    warnings.push(`检测到多个页面基址（${baseUrls.join(', ')}）；可留空由角色自行识别，或用 config --base-url 固定一个`);
   }
 
   return {

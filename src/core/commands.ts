@@ -19,6 +19,7 @@ export interface CommandCheckResult {
 export interface CommandCheckOutcome {
   issues: CheckIssue[];
   results: CommandCheckResult[];
+  warnings: string[];
 }
 
 function variables(root: string, config: Config, story: string, stage: string, round: number): Record<string, string> {
@@ -70,8 +71,9 @@ export function runRoleCommandChecks(
 ): CommandCheckOutcome {
   const issues: CheckIssue[] = [];
   const results: CommandCheckResult[] = [];
+  const warnings: string[] = [];
   const role = config.roles[roleName];
-  if (!role?.run_checks?.length) return { issues, results };
+  if (!role?.run_checks?.length) return { issues, results, warnings };
   const values = variables(root, config, story, stage, round);
 
   for (const name of role.run_checks) {
@@ -82,7 +84,7 @@ export function runRoleCommandChecks(
     }
     const command = interpolate(check.command, values).trim();
     if (command === '') {
-      issues.push({ kind: 'command', message: `${roleName} 的检查 ${name} 渲染后为空` });
+      warnings.push(`${roleName} 的检查 ${name} 渲染后为空（对应命令未配置），已跳过`);
       continue;
     }
     const shell = shellInvocation(config, command);
@@ -157,5 +159,5 @@ export function runRoleCommandChecks(
     }
   }
 
-  return { issues, results };
+  return { issues, results, warnings };
 }

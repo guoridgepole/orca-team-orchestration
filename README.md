@@ -219,7 +219,7 @@ orca --version       # macOS / Windows
 orca-team-orchestration init
 ```
 
-`init` 会显示检测到的 Orca CLI 路径，自动探测常见的 `package.json` 脚本、源码目录和 SQL 文件，并创建：
+`init` 会显示检测到的 Orca CLI 路径，自动探测常见的 `package.json` 脚本、源码目录和 SQL 文件。运行命令识别不到时会保持为空，不阻塞后续流程。它还会创建：
 
 ```text
 .orca-team-orchestration/
@@ -234,7 +234,7 @@ docs/
 
 它还会把 `.orca-team-orchestration/runs/` 加入 `.gitignore`，并默认在 `.git/hooks/pre-commit` 安装守则检查（`--no-hook` 可跳过；已有非本工具的 hook 会备份为 `pre-commit.bak`）。Orca 已安装但当前未打开时仍可完成初始化；`init` 只检查可执行文件，不会启动 Orca。配置文件被重复初始化时会拒绝覆盖；只有确认需要重置时才使用 `--force`。
 
-### 3.3 补全项目命令
+### 3.3 项目命令（可选）
 
 查看配置：
 
@@ -242,7 +242,7 @@ docs/
 orca-team-orchestration config --print
 ```
 
-设置启动、测试和访问地址：
+需要固定启动、测试和访问地址时：
 
 ```bash
 orca-team-orchestration config \
@@ -251,7 +251,7 @@ orca-team-orchestration config \
   --base-url "http://127.0.0.1:5173/"
 ```
 
-`start` 和 `test` 是开始执行 Story 的必需配置。`base_url` 在测试阶段需要浏览器访问时使用。
+这些字段不再是必填项。`init` 识别不到时会让它们保持为空，并提示“运行信息未配置”；`start` / `resume` 不会因此阻塞。各角色会在运行前自行识别项目命令和基址：developer 将识别结果写入研发报告的“运行环境”一节，tester 优先复用。项目结构复杂、希望结果稳定可复现时，再用 `config` 固定。
 
 在交互式终端中只执行 `orca-team-orchestration config`，CLI 会逐项询问；脚本或 CI 中应显式传入参数。
 
@@ -434,7 +434,7 @@ guards:
 - 子仓必须嵌套在 workspace 内（不能是符号链接，也不能是 `.git` 文件的 worktree/submodule）；v1 不支持用 `runtime.worktree` 的 branch 选择器只覆盖某个子仓，配置里只能是 `path:.`。
 - 如果子仓路径已经被根仓跟踪，`init --workspace` 会报错并提示先执行 `git rm -r --cached <path>`，不会自动修改索引。
 - `project.repos` 只认项目配置；全局配置中的同名段会被忽略。
-- 自动探测到的 `start` / `base_url` 只有在唯一值时才写入；多个前端/服务时请用 `config` 明确指定。
+- 自动探测到的 `start` / `base_url` 只有在唯一值时才写入；多个前端/服务时保持为空，由角色在运行时自行识别，也可用 `config` 固定。
 
 ## 4. 编写 Story
 
@@ -880,7 +880,7 @@ project:
 runtime:
   orchestrator: orca
   shell: auto
-  timeout_minutes: 30
+  timeout_minutes: 60
   max_rounds:
     design_review: 3
     dev_test: 3
@@ -1015,8 +1015,8 @@ orca-team-orchestration doctor --json
 |---|---|
 | `orca-team-orchestration init [--force] [--baseline] [--orca-add] [--no-hook]` | 检查 Orca 后接入当前 Git 仓库（默认安装 pre-commit hook） |
 | `orca-team-orchestration init --workspace [--repos a,b] [--no-commit] [--force] [--no-hook] [--orca-add]` | 把父目录接入为多仓 workspace：自动建根仓、发现/校验嵌套仓库、写配置与 managed `.gitignore`、安装根+子仓 hook |
-| `orca-team-orchestration config [--print]` | 查看或补全项目命令 |
-| `orca-team-orchestration config --start CMD --test CMD --base-url URL` | 非交互更新命令和基址 |
+| `orca-team-orchestration config [--print]` | 查看项目命令与配置 |
+| `orca-team-orchestration config --start CMD --test CMD --base-url URL` | 非交互固定命令和基址（可选） |
 | `orca-team-orchestration new <story> [--title 标题] [--no-commit]` | 创建 Story 骨架 |
 | `orca-team-orchestration list [--all] [--json]` | 列出 Story |
 | `orca-team-orchestration lint [<story>] [--json]` | 校验一条或全部 Story |
@@ -1210,12 +1210,14 @@ roles:
 
 修改后运行 `orca-team-orchestration check develop <story>` 确认 scope 判定符合预期。
 
-### `start` 提示缺少 `project.commands.start` 或 `test`
+### `init` 提示“运行信息未配置”
 
-补全命令：
+这不是阻塞项。各角色会在运行前自行识别启动、测试命令和页面基址，developer 会把结果写入研发报告“运行环境”一节，tester 优先复用。
+
+如果希望结果稳定、可复现，可以随时固定：
 
 ```bash
-orca-team-orchestration config --start "npm run dev" --test "npm test"
+orca-team-orchestration config --start "npm run dev" --test "npm test" --base-url "http://127.0.0.1:5173/"
 ```
 
 ### `start` 提示依赖尚未验收

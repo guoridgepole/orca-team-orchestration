@@ -278,6 +278,22 @@ describe('runner 阶段闭环', () => {
     }
   });
 
+  it('空命令检查被跳过并告警，不阻止阶段通过', async () => {
+    const config = builtinDefaults('demo');
+    config.roles.designer!.run_checks = ['project-test'];
+    const { root, state } = setupRepo(config);
+    try {
+      const { result, logs } = await run(root, config, state, (d) => {
+        const rel = writeArtifact(root, config, d);
+        return { outcome: 'succeeded', summary: 'ok', reportPath: rel };
+      });
+      assert.equal(result.exitCode, EXIT.ok);
+      assert.match(logs.join('\n'), /warning: .*project-test.*已跳过/);
+    } finally {
+      cleanup(root);
+    }
+  });
+
   it('worker outcome=failed 视为阶段失败', async () => {
     const config = builtinDefaults('demo');
     config.runtime.max_rounds.design_review = 1;

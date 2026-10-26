@@ -888,7 +888,10 @@ function resolveStage(config: Config, roleName: string, requested?: string): { s
 function projectSegment(config: Config, root: string, version: string | null): string {
   const commands = config.project.commands;
   const paths = config.project.paths;
-  const command = (value: string | null | undefined): string => (value ? `\`${value}\`` : '未配置');
+  const command = (value: string | null | undefined): string =>
+    value ? `\`${value}\`` : '未配置（运行时由角色自行识别）';
+  const optionalCommand = (value: string | null | undefined): string => (value ? `\`${value}\`` : '未配置');
+  const hasMissingRuntime = [commands.start, commands.test, commands.base_url].some((value) => !value);
   const guards =
     config.guards.length === 0
       ? '(无)'
@@ -910,8 +913,13 @@ function projectSegment(config: Config, root: string, version: string | null): s
       : [`- 仓库：${root}`]),
     `- 启动命令：${command(commands.start)}`,
     `- 测试命令：${command(commands.test)}`,
-    `- 构建命令：${command(commands.build)}`,
+    `- 构建命令：${optionalCommand(commands.build)}`,
     `- 页面基址：${command(commands.base_url)}`,
+    ...(hasMissingRuntime
+      ? [
+          '- 运行信息：未配置项由角色在运行前自行识别（参考 package.json、workspace/构建配置和启动日志）；developer 将结果写入研发报告“运行环境”，tester 优先复用。',
+        ]
+      : []),
     `- 需求目录：${paths.features_dir}`,
     `- 文档目录：${paths.docs}`,
     `- 源码目录：${paths.source.join(', ') || '(未配置)'}`,
@@ -991,7 +999,7 @@ export function renderRolePrompt(
   });
   const browserUrl = role.browser?.url ? renderValue(role.browser.url, variables) : '';
   const browser = role.browser
-    ? `${role.browser.driver}（${browserUrl || '基址未配置'}）`
+    ? `${role.browser.driver}（${browserUrl || '基址未配置，运行时自行识别'}）`
     : null;
 
   const taskLines = [

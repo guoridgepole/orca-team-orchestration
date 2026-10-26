@@ -344,6 +344,17 @@ test('渲染顺序、需求快照、围栏与轮次上限', () => {
   assert.equal(rendered.warnings.some((warning) => warning.includes('实时')), false);
 });
 
+test('运行信息缺失时提示角色自行识别并交接', () => {
+  const root = project('prompt-runtime-discovery');
+  const developer = renderRolePrompt(root, loadConfig(root), 'developer');
+  assert.match(developer.prompt, /未配置（运行时由角色自行识别）/);
+  assert.match(developer.prompt, /developer 将结果写入研发报告“运行环境”，tester 优先复用/);
+
+  const tester = renderRolePrompt(root, loadConfig(root), 'tester');
+  assert.match(tester.prompt, /基址未配置，运行时自行识别/);
+  assert.match(tester.prompt, /优先复用研发报告“运行环境”/);
+});
+
 test('缺少需求快照时读取实时文件并给出 warning', () => {
   const root = project('prompt-live');
   write(root, 'features/story-0.1.0-001.md', '实时需求内容\n');

@@ -19,7 +19,7 @@ project:
 runtime:
   orchestrator: orca
   shell: auto
-  timeout_minutes: 30
+  timeout_minutes: 60
   max_rounds:
     design_review: 3
     dev_test: 3

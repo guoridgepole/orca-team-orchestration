@@ -89,6 +89,24 @@ describe('init → new → lint → start → status', () => {
     assert.match(second.stderr, /已存在/);
   });
 
+  it('未识别到运行命令时 init 不阻塞，start 仍可执行', () => {
+    const root = tempRepo('cli-no-commands');
+    dirs.push(root);
+    write(root, 'README.md', '# demo\n');
+    commitAll(root);
+
+    const initialized = cli(root, ['init']);
+    assert.equal(initialized.code, EXIT.ok, initialized.stderr);
+    assert.match(initialized.stdout, /运行信息未配置/);
+    const config = fs.readFileSync(path.join(root, '.orca-team-orchestration/config.yaml'), 'utf8');
+    assert.match(config, /start: null/);
+    assert.match(config, /test: null/);
+
+    write(root, 'features/story-0.1.0-001.md', VALID_STORY);
+    const dry = cli(root, ['start', 'story-0.1.0-001', '--dry-run', '--orchestrator', 'orca']);
+    assert.equal(dry.code, EXIT.ok, dry.stderr);
+  });
+
   it('updates project commands in place', () => {
     const result = cli(root, ['config', '--base-url', 'http://127.0.0.1:5173/']);
     assert.equal(result.code, EXIT.ok, result.stderr);

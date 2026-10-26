@@ -231,6 +231,7 @@ async function runStage(options: RunnerOptions, stage: string): Promise<StageOut
     const scope = scopeIssuesForWorkspace(layout, config, stage, state.story, scopeIgnore);
     const guards = settleViolations(root, runGuards(root, config.guards, { layout }), layout).blocking;
     const commands = runRoleCommandChecks(root, config, roleName, stage, state.story, round);
+    for (const warning of commands.warnings) log(`warning: ${warning}`);
     const issues = [...artifactIssues, ...scope, ...commands.issues];
 
     const relative = roleArtifactPath(config, roleName, state.story, round);
