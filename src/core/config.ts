@@ -4,6 +4,7 @@ import path from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { CliError, EXIT } from './errors.js';
 import { normalizePattern, readText, toPosix, writeText } from './paths.js';
+import { STORY_ID_RE, versionFromStory } from './story.js';
 
 export type OrchestratorKind = 'auto' | 'orca';
 export type ShellKind = 'auto' | 'sh' | 'pwsh' | 'cmd';
@@ -181,7 +182,7 @@ export function builtinDefaults(projectName: string): Config {
         source: [],
         tests: [],
         db: null,
-        evidence: 'docs/test/evidence',
+        evidence: 'docs/v{{version}}/test/evidence',
       },
     },
     runtime: {
@@ -200,19 +201,19 @@ export function builtinDefaults(projectName: string): Config {
     roles: {
       designer: {
         agent: 'claude-main',
-        writes: ['docs/design/'],
+        writes: ['docs/v{{version}}/design/'],
         artifact: {
-          path: 'docs/design/{{story}}-r{{round}}.md',
+          path: 'docs/v{{version}}/design/{{story}}-r{{round}}.md',
           template: 'designer',
           required_sections: ['目标', '验收映射', '数据库变更', '失败路径', '回滚'],
         },
       },
       reviewer: {
         agent: 'codex-review',
-        writes: ['docs/review/'],
+        writes: ['docs/v{{version}}/review/'],
         readonly_source: true,
         artifact: {
-          path: 'docs/review/{{story}}-r{{round}}.md',
+          path: 'docs/v{{version}}/review/{{story}}-r{{round}}.md',
           template: 'reviewer',
           required_sections: ['问题清单', '通过条件'],
           first_line: ['PASS', 'REJECT'],
@@ -220,18 +221,18 @@ export function builtinDefaults(projectName: string): Config {
       },
       developer: {
         agent: 'claude-main',
-        writes: ['docs/dev/'],
+        writes: ['docs/v{{version}}/dev/'],
         artifact: {
-          path: 'docs/dev/{{story}}-r{{round}}.md',
+          path: 'docs/v{{version}}/dev/{{story}}-r{{round}}.md',
           template: 'developer',
           required_sections: ['变更', '自测', 'SQL'],
         },
       },
       tester: {
         agent: 'codex-review',
-        writes: ['docs/test/'],
+        writes: ['docs/v{{version}}/test/'],
         artifact: {
-          path: 'docs/test/{{story}}-r{{round}}.md',
+          path: 'docs/v{{version}}/test/{{story}}-r{{round}}.md',
           template: 'tester',
           required_sections: ['用例结果', '证据'],
           first_line: ['PASS', 'FAIL'],
@@ -362,7 +363,6 @@ export const AGENT_KINDS = ['claude', 'codex', 'zcode', 'opencode', 'qoder', 'co
 export const EFFORTS = ['low', 'medium', 'high'];
 const BROWSER_DRIVERS = ['orca', 'playwright', 'mcp', 'none'];
 const GUARD_TYPES = ['append-only', 'immutable', 'no-delete'];
-const STORY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const ROLE_NAME = /^[\p{L}\p{N}][\p{L}\p{N}._-]{0,63}$/u;
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
 
@@ -884,7 +884,16 @@ export function readProjectSettings(root: string): SettingsSnapshot {
 }
 
 export function isStoryId(value: string): boolean {
-  return STORY_ID.test(value);
+  return STORY_ID_RE.test(value);
+}
+
+export function checkpointManagedPaths(config: Config, story: string): string[] {
+  const version = versionFromStory(story) ?? '{{version}}';
+  return [
+    config.project.paths.features_dir,
+    config.project.paths.docs,
+    config.project.paths.evidence.replaceAll('{{version}}', version),
+  ];
 }
 
 export function roleList(flowValue: string | string[] | null): string[] {

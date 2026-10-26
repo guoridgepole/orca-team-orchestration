@@ -11,10 +11,16 @@ function initRepo(dir: string): void {
   runGit(dir, ['config', 'user.name', 'Orca Team Orchestration Test']);
 }
 
+// macOS 上 git rev-parse --show-toplevel 与 fs.realpathSync 会把 /var 解析为 /private/var，
+// 测试断言若混用两种形式会误报；darwin 下统一返回真实路径形式。
+function normalizeTempDir(dir: string): string {
+  return process.platform === 'darwin' ? fs.realpathSync(dir) : dir;
+}
+
 export function tempRepo(prefix = 'repo'): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `orca-team-orchestration-${prefix}-`));
   initRepo(dir);
-  return dir;
+  return normalizeTempDir(dir);
 }
 
 export interface TempWorkspace {
@@ -24,7 +30,7 @@ export interface TempWorkspace {
 }
 
 export function tempWorkspace(options: { gitRoot?: boolean } = {}): TempWorkspace {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'orca-team-orchestration-workspace-'));
+  const root = normalizeTempDir(fs.mkdtempSync(path.join(os.tmpdir(), 'orca-team-orchestration-workspace-')));
   if (options.gitRoot !== false) {
     initRepo(root);
     fs.writeFileSync(path.join(root, 'README.md'), '# workspace\n', 'utf8');
@@ -88,7 +94,7 @@ export function cleanup(root: string): void {
   fs.rmSync(root, { recursive: true, force: true });
 }
 
-export const VALID_STORY = `# story-001 午餐抽签
+export const VALID_STORY = `# story-0.1.0-001 午餐抽签
 
 - 背景: 中午不知道吃什么
 - 明确不做:
@@ -101,6 +107,6 @@ export const VALID_STORY = `# story-001 午餐抽签
 
 ## 验收标准
 
-- [ ] story-001-1 打开页面能看到抽签按钮
-- [ ] story-001-2 点击后显示一个菜名
+- [ ] story-0.1.0-001-1 打开页面能看到抽签按钮
+- [ ] story-0.1.0-001-2 点击后显示一个菜名
 `;

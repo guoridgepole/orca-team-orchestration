@@ -22,7 +22,7 @@ import { renderArtifactPath } from './checks.js';
 import { PromptError } from './errors.js';
 import { isInside, readText, toPosix, writeText } from './paths.js';
 import { readState, specSnapshotPath } from './state.js';
-import { storyPath } from './story.js';
+import { storyPath, versionFromStory } from './story.js';
 
 const MAX_PROMPT_BYTES = 64 * 1024;
 const ROLES_DIR = path.join('.orca-team-orchestration', 'roles');
@@ -853,8 +853,10 @@ function renderValue(value: string, variables: Record<string, string>): string {
   return value.replace(/\{\{([a-zA-Z0-9_.]+)\}\}/g, (match: string, key: string) => variables[key] ?? match);
 }
 
-function roleAllowedWrites(config: Config, roleName: string, role: RoleConfig): string[] {
-  const allowed = new Set(role.writes);
+function roleAllowedWrites(config: Config, roleName: string, role: RoleConfig, version: string | null): string[] {
+  const allowed = new Set(
+    role.writes.map((pattern) => pattern.replaceAll('{{version}}', version ?? '{{version}}')),
+  );
   if (roleName === config.flow.develop) {
     for (const pattern of config.project.paths.source) allowed.add(pattern);
     for (const pattern of config.project.paths.tests) allowed.add(pattern);
@@ -883,7 +885,7 @@ function resolveStage(config: Config, roleName: string, requested?: string): { s
   return { stage: 'unassigned', warning: `角色 ${roleName} 未进入 flow，无法确定阶段` };
 }
 
-function projectSegment(config: Config, root: string): string {
+function projectSegment(config: Config, root: string, version: string | null): string {
   const commands = config.project.commands;
   const paths = config.project.paths;
   const command = (value: string | null | undefined): string => (value ? `\`${value}\`` : '未配置');
@@ -915,7 +917,7 @@ function projectSegment(config: Config, root: string): string {
     `- 源码目录：${paths.source.join(', ') || '(未配置)'}`,
     `- 测试目录：${paths.tests.join(', ') || '(未配置)'}`,
     `- 数据库：${paths.db ?? '(无)'}`,
-    `- 证据目录：${paths.evidence}`,
+    `- 证据目录：${paths.evidence.replaceAll('{{version}}', version ?? '{{version}}')}`,
     `- 轮次上限：设计⇄审核 ${config.runtime.max_rounds.design_review} / 开发⇄测试 ${config.runtime.max_rounds.dev_test}`,
     '',
     '### 守则',
@@ -932,6 +934,10 @@ export function renderRolePrompt(
 ): RenderedRolePrompt {
   const role = config.roles[roleName];
   if (!role) throw new PromptError('invalid', `未知角色：${roleName}`);
+  if (options.story !== undefined && !isStoryId(options.story)) {
+    throw new PromptError('invalid', `story id 非法：${options.story}`);
+  }
+  const version = options.story ? versionFromStory(options.story) : null;
 
   const warnings: string[] = [];
   const resolved = resolveTemplateLocale(config.locale);
@@ -967,6 +973,7 @@ export function renderRolePrompt(
   const variables: Record<string, string> = {
     story: options.story ?? '',
     round: String(round),
+    version: version ?? '',
     stage,
     repo: root,
     workspace: root,
@@ -976,7 +983,7 @@ export function renderRolePrompt(
   };
   const artifact = renderArtifactPath(role.artifact.path, options.story ?? '', round);
   const limit = roundLimit(config, stage);
-  const writes = roleAllowedWrites(config, roleName, role);
+  const writes = roleAllowedWrites(config, roleName, role, version);
   const checks = (role.run_checks ?? []).map((name) => {
     const check = config.checks[name];
     if (!check) return `${name}（未定义）`;
@@ -1007,7 +1014,6 @@ export function renderRolePrompt(
   ];
 
   if (options.story) {
-    if (!isStoryId(options.story)) throw new PromptError('invalid', `story id 非法：${options.story}`);
     const snapshotPath = specSnapshotPath(root, options.story);
     const livePath = storyPath(root, config.project.paths.features_dir, options.story);
     const snapshotContent = readText(snapshotPath);
@@ -1046,7 +1052,7 @@ export function renderRolePrompt(
       `<!-- oto prompt v1 role=${roleName} stage=${stage} round=${round} locale=${resolved.locale} contract=${contractSource} -->`,
       system,
       contract,
-      projectSegment(config, root),
+      projectSegment(config, root, version),
       requirement,
       taskLines.join('\n'),
       role.rules?.trim() ? `## 项目规则\n\n${role.rules.trim()}` : '',
@@ -1063,7 +1069,7 @@ export function renderRolePrompt(
     `<!-- oto prompt v1 role=${roleName} stage=${stage} round=${round} locale=${resolved.locale} contract=${contractSource} -->`,
     system,
     contract,
-    projectSegment(config, root),
+    projectSegment(config, root, version),
     taskLines.join('\n'),
     role.rules?.trim() ? `## 项目规则\n\n${role.rules.trim()}` : '',
   ]

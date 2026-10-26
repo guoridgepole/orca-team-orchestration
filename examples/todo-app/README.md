@@ -12,7 +12,7 @@
 ```
 todo-app/
   .orca-team-orchestration/config.yaml   # 含 guards 与 checks 的配置
-  features/story-002.md                  # 需求源文件（含依赖关系与 4 条验收）
+  features/story-0.2.0-001.md                  # 需求源文件（含依赖关系与 4 条验收）
   package.json                           # dev/test/build 脚本（被 config-immutable 守护）
   src/store.js src/server.js             # 最小实现
   test/todo.test.js                      # node --test
@@ -47,11 +47,11 @@ git commit -m "chore: 改表结构"                       # 审批后放行（�
 命令检查（不启动真实 agent，单跑校验）：
 
 ```bash
-node ../../dist/src/cli/index.js check develop story-002   # 会执行 project-test（npm test）
+node ../../dist/src/cli/index.js check develop story-0.2.0-001   # 会执行 project-test（npm test）
 ```
 
 ## 说明
 
-- `features/story-002.md` 的 F3 标注了依赖（F1、F2），验收含 `npm test` 通过条件；
+- `features/story-0.2.0-001.md` 的 F3 标注了依赖（F1、F2），验收含 `npm test` 通过条件；
 - `project.paths.db = db/update.sql`，design 模板要求写明「数据库变更」章节；
 - `runtime.push` 固定为 `false`，本 CLI 从不执行 `git push`。

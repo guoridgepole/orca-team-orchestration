@@ -4,6 +4,7 @@ import type { Config } from './config.js';
 import { stageRoles } from './config.js';
 import { runGit } from './git.js';
 import { normalizePattern, readText, toPosix } from './paths.js';
+import { versionFromStory } from './story.js';
 import { ROOT_REPO_NAME, type WorkspaceLayout } from './workspace.js';
 
 export interface CheckIssue {
@@ -12,7 +13,11 @@ export interface CheckIssue {
 }
 
 export function renderArtifactPath(template: string, story: string, round: number): string {
-  return template.replaceAll('{{story}}', story).replaceAll('{{round}}', String(round));
+  const version = versionFromStory(story);
+  return template
+    .replaceAll('{{story}}', story)
+    .replaceAll('{{round}}', String(round))
+    .replaceAll('{{version}}', version ?? '{{version}}');
 }
 
 function escapeRegExp(value: string): string {
@@ -136,14 +141,16 @@ function scopeIssuesFrom(
   dirty: Iterable<string>,
   config: Config,
   stage: string,
+  story: string,
   ignore: ReadonlySet<string>,
 ): CheckIssue[] {
+  const version = versionFromStory(story) ?? '{{version}}';
   const roles = stageRoles(config, stage);
   const allowed = new Set<string>();
   for (const roleName of roles) {
     const role = config.roles[roleName];
     if (!role) continue;
-    for (const pattern of role.writes) allowed.add(normalizePattern(pattern));
+    for (const pattern of role.writes) allowed.add(normalizePattern(pattern.replaceAll('{{version}}', version)));
     if (roleName === config.flow.develop) {
       for (const pattern of config.project.paths.source) allowed.add(normalizePattern(pattern));
       for (const pattern of config.project.paths.tests) allowed.add(normalizePattern(pattern));
@@ -172,16 +179,18 @@ export function scopeIssues(
   root: string,
   config: Config,
   stage: string,
+  story: string,
   ignore: ReadonlySet<string> = new Set(),
 ): CheckIssue[] {
-  return scopeIssuesFrom(dirtyPaths(root), config, stage, ignore);
+  return scopeIssuesFrom(dirtyPaths(root), config, stage, story, ignore);
 }
 
 export function scopeIssuesForWorkspace(
   layout: WorkspaceLayout,
   config: Config,
   stage: string,
+  story: string,
   ignore: ReadonlySet<string> = new Set(),
 ): CheckIssue[] {
-  return scopeIssuesFrom(workspaceDirtyPaths(layout), config, stage, ignore);
+  return scopeIssuesFrom(workspaceDirtyPaths(layout), config, stage, story, ignore);
 }

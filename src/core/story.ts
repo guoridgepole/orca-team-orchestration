@@ -50,9 +50,26 @@ export class StoryLintError extends CliError {
   }
 }
 
-const STORY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+export const STORY_ID_RE = /^story-(\d+)\.(\d+)\.(\d+)-(\d+)$/;
 const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const META_KEYS = ['背景', '依赖', '明确不做', '测试数据', '详见'] as const;
+
+export function versionFromStory(storyId: string): string | null {
+  const match = STORY_ID_RE.exec(storyId);
+  if (!match) return null;
+  return `${match[1]}.${match[2]}.${match[3]}`;
+}
+
+export function requireVersion(storyId: string): string {
+  const version = versionFromStory(storyId);
+  if (version === null) {
+    throw new CliError(
+      EXIT.usage,
+      `story id 非法：${storyId}（格式：story-<版本>-<序号>，如 story-0.1.0-001）`,
+    );
+  }
+  return version;
+}
 
 export function storyPath(root: string, featuresDir: string, storyId: string): string {
   return path.join(root, featuresDir, `${storyId}.md`);
@@ -258,9 +275,7 @@ function looksLikeTableHeader(value: string): boolean {
 }
 
 export function loadStory(root: string, featuresDir: string, storyId: string): Story {
-  if (!STORY_ID.test(storyId)) {
-    throw new CliError(EXIT.usage, `story id 非法：${storyId}`);
-  }
+  requireVersion(storyId);
   const file = storyPath(root, featuresDir, storyId);
   const content = readText(file);
   if (content === null) {

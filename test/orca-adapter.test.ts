@@ -80,7 +80,7 @@ function loggedArgs(): string[][] {
 function plan(overrides: Partial<DispatchPlan> = {}): DispatchPlan {
   return {
     runId: 'run_fake',
-    story: 'story-001',
+    story: 'story-0.1.0-001',
     stage: 'develop',
     role: 'developer',
     round: 1,
@@ -105,11 +105,11 @@ describe('Orca adapter', { skip }, () => {
   it('probe 与 createRun/useRun 解析 run id', async () => {
     const a = adapter();
     await a.probe();
-    assert.equal(await a.createRun('story-001 午餐抽签'), 'run_fake');
+    assert.equal(await a.createRun('story-0.1.0-001 午餐抽签'), 'run_fake');
     await a.useRun('run_fake');
     const args = loggedArgs();
     assert.deepEqual(args[0], ['orchestration', 'run-list', '--json']);
-    assert.deepEqual(args[1], ['orchestration', 'run-create', '--objective', 'story-001 午餐抽签', '--json']);
+    assert.deepEqual(args[1], ['orchestration', 'run-create', '--objective', 'story-0.1.0-001 午餐抽签', '--json']);
     assert.ok(args[2]?.includes('run-use'));
   });
 
@@ -123,7 +123,7 @@ describe('Orca adapter', { skip }, () => {
     assert.ok(start.includes('--worktree'), JSON.stringify(start));
     assert.ok(start.includes(`path:${root}`), JSON.stringify(start));
     assert.ok(start.includes('--agent') && start.includes('codex'));
-    assert.ok(start.includes('DEVELOP story-001 r1'));
+    assert.ok(start.includes('DEVELOP story-0.1.0-001 r1'));
     assert.ok(start.includes('--model') && start.includes('gpt-x'));
     assert.ok(start.includes('--effort') && start.includes('high'));
     assert.ok(start.includes('--flag'));

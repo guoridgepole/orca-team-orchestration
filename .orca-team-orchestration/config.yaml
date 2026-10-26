@@ -16,7 +16,7 @@ project:
     tests:
       - test/
     db: null
-    evidence: docs/test/evidence
+    evidence: docs/v{{version}}/test/evidence
 runtime:
   orchestrator: orca
   shell: auto
@@ -31,9 +31,9 @@ roles:
   designer:
     agent: claude-main
     writes:
-      - docs/design/
+      - docs/v{{version}}/design/
     artifact:
-      path: docs/design/{{story}}-r{{round}}.md
+      path: docs/v{{version}}/design/{{story}}-r{{round}}.md
       template: designer
       required_sections:
         - 目标
@@ -44,10 +44,10 @@ roles:
   reviewer:
     agent: codex-review
     writes:
-      - docs/review/
+      - docs/v{{version}}/review/
     readonly_source: true
     artifact:
-      path: docs/review/{{story}}-r{{round}}.md
+      path: docs/v{{version}}/review/{{story}}-r{{round}}.md
       template: reviewer
       required_sections:
         - 问题清单
@@ -58,9 +58,9 @@ roles:
   developer:
     agent: claude-main
     writes:
-      - docs/dev/
+      - docs/v{{version}}/dev/
     artifact:
-      path: docs/dev/{{story}}-r{{round}}.md
+      path: docs/v{{version}}/dev/{{story}}-r{{round}}.md
       template: developer
       required_sections:
         - 变更
@@ -69,9 +69,9 @@ roles:
   tester:
     agent: codex-review
     writes:
-      - docs/test/
+      - docs/v{{version}}/test/
     artifact:
-      path: docs/test/{{story}}-r{{round}}.md
+      path: docs/v{{version}}/test/{{story}}-r{{round}}.md
       template: tester
       required_sections:
         - 用例结果

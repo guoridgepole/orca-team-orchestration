@@ -18,7 +18,7 @@ import { parseStoryContent } from '../src/core/story.js';
 import { VALID_STORY, cleanup, tempRepo, write } from './helpers.js';
 
 const dirs: string[] = [];
-const { story } = parseStoryContent(VALID_STORY, 'story-001');
+const { story } = parseStoryContent(VALID_STORY, 'story-0.1.0-001');
 
 function repo(): string {
   const root = tempRepo('state');
@@ -39,8 +39,8 @@ describe('spec snapshot', () => {
     const root = repo();
     const spec = snapshotSpec(root, story.id, VALID_STORY.replace(/\n/g, '\r\n'));
 
-    assert.equal(spec.source, 'features/story-001.md');
-    assert.equal(spec.snapshot, '.orca-team-orchestration/runs/story-001/spec.md');
+    assert.equal(spec.source, 'features/story-0.1.0-001.md');
+    assert.equal(spec.snapshot, '.orca-team-orchestration/runs/story-0.1.0-001/spec.md');
     assert.equal(spec.sha256, hashContent(VALID_STORY));
 
     const copied = fs.readFileSync(path.join(root, spec.snapshot), 'utf8');
@@ -51,12 +51,12 @@ describe('spec snapshot', () => {
   it('matches the snapshot hash while the story is unchanged', () => {
     const root = repo();
     const spec = snapshotSpec(root, story.id, VALID_STORY);
-    write(root, 'features/story-001.md', VALID_STORY);
+    write(root, 'features/story-0.1.0-001.md', VALID_STORY);
     const state = stateAt(root, spec);
 
     assert.equal(specHashMatches(root, state), true);
 
-    write(root, 'features/story-001.md', `${VALID_STORY}\n- 新增一条\n`);
+    write(root, 'features/story-0.1.0-001.md', `${VALID_STORY}\n- 新增一条\n`);
     assert.equal(specHashMatches(root, state), false);
   });
 
@@ -70,13 +70,13 @@ describe('spec snapshot', () => {
   it('supports a custom features_dir and still reads legacy source paths', () => {
     const root = repo();
     const spec = snapshotSpec(root, story.id, VALID_STORY, 'specs');
-    assert.equal(spec.source, 'specs/story-001.md');
-    write(root, 'specs/story-001.md', VALID_STORY);
+    assert.equal(spec.source, 'specs/story-0.1.0-001.md');
+    write(root, 'specs/story-0.1.0-001.md', VALID_STORY);
     const state = stateAt(root, spec);
     assert.equal(specHashMatches(root, state), true);
 
-    const legacy = { ...state, spec: { ...state.spec, source: 'features/story-001.md' } };
-    write(root, 'features/story-001.md', VALID_STORY);
+    const legacy = { ...state, spec: { ...state.spec, source: 'features/story-0.1.0-001.md' } };
+    write(root, 'features/story-0.1.0-001.md', VALID_STORY);
     assert.equal(specHashMatches(root, legacy), true);
   });
 
@@ -110,8 +110,8 @@ describe('run state', () => {
     const state = stateAt(root);
 
     assert.deepEqual(state.features, ['F1', 'F2']);
-    assert.deepEqual(state.acceptance, ['story-001-1', 'story-001-2']);
-    assert.equal(state.story, 'story-001');
+    assert.deepEqual(state.acceptance, ['story-0.1.0-001-1', 'story-0.1.0-001-2']);
+    assert.equal(state.story, 'story-0.1.0-001');
     assert.equal(state.title, '午餐抽签');
   });
 });

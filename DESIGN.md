@@ -13,7 +13,7 @@
 
 - **任意项目**：`orca-team-orchestration init` 一次接入；之后一条需求写一个 `features/<story>.md`，`start` 该 story 即可开发其中全部功能。
 - **任意机器**：macOS / Linux / Windows 原生可用，不要求 bash。
-- **Orca 为前提**：`init` 必须检测到 `orca-ide`；缺失时提示安装并终止，不提供静默降级。
+- **Orca 为前提**：`init` 必须检测到 Orca CLI（Linux 为 `orca-ide`，macOS / Windows 为 `orca`；探测顺序为 PATH 中 `orca-ide` → 校验过版本的 `orca` → 平台默认安装位置，可用 `ORCA_TEAM_ORCHESTRATION_ORCA` 覆盖）；缺失时提示安装并终止，不提供静默降级。
 - **配置驱动**：角色数量、每个角色用哪个 agent、哪个模型、产物路径、守则，全在配置文件里。
 - **规则可机检**：配置里的每条硬约束都对应一个真实校验，而不是只写在 prompt 里。
 - **多仓联动**：前后端是两个独立 Git 仓库时，把共同父目录接入为 Workspace，让一条 Story 同时约束根仓与各子仓，而不是拆成多条互不感知的 Story。
@@ -57,17 +57,17 @@ npx orca-team-orchestration init
 npm run dev
 
 # 需求方在 features/<story>.md 里写需求与功能清单（也可用 orca-team-orchestration new 生成骨架）
-orca-team-orchestration new story-0011-001 --title "午餐抽签"
+orca-team-orchestration new story-0.1.0-001 --title "午餐抽签"
 
 # 查看已有 story 并选择一条开始开发；不带参数时交互选择
 orca-team-orchestration list
-orca-team-orchestration start story-0011-001
+orca-team-orchestration start story-0.1.0-001
 ```
 
 - 一个文件 = 一条 story；文件里的功能清单有几条，就开发几条，不拆半条。
 - 初始化和默认编排必须使用 Orca；未安装时提示安装并终止。`auto` 不再降级到 `sequential`。
 - Orca 编排器统一负责派发，本地工作台只读展示配置和运行依赖。
-- 中断后 `orca-team-orchestration resume story-0011-001` 从状态文件继续。
+- 中断后 `orca-team-orchestration resume story-0.1.0-001` 从状态文件继续。
 
 ## 4. 架构
 
@@ -136,7 +136,7 @@ project:
     source: ["public/"]        # 开发角色可写的源码目录
     tests: ["test/"]           # 测试目录
     db: "db/update.sql"        # 数据库迁移文件；无数据库填 null
-    evidence: "docs/test/evidence"   # 测试证据目录
+    evidence: "docs/v{{version}}/test/evidence"   # 测试证据目录
 
 runtime:
   orchestrator: orca           # 默认 orca；auto 也必须检测到 Orca
@@ -163,34 +163,34 @@ agents:                        # 任意命名、任意数量
 roles:                         # 角色数量、名称由这里决定
   designer:
     agent: claude-main
-    writes: ["docs/design/"]
+    writes: ["docs/v{{version}}/design/"]
     artifact:
-      path: "docs/design/{{story}}-r{{round}}.md"
+      path: "docs/v{{version}}/design/{{story}}-r{{round}}.md"
       template: designer       # 内置模板名，或项目内文件路径
       required_sections: ["目标", "验收映射", "数据库变更", "失败路径", "回滚"]
     rules: ""                  # 追加到角色契约之后的小段约束；整段替换契约用 .orca-team-orchestration/roles/<role>.md
   reviewer:
     agent: codex-review
-    writes: ["docs/review/"]
+    writes: ["docs/v{{version}}/review/"]
     readonly_source: true      # 除 writes 外不得有工作区改动
     artifact:
-      path: "docs/review/{{story}}-r{{round}}.md"
+      path: "docs/v{{version}}/review/{{story}}-r{{round}}.md"
       template: reviewer
       required_sections: ["问题清单", "通过条件"]
       first_line: ["PASS", "REJECT"]
   developer:
     agent: claude-main
-    writes: ["docs/dev/"]
+    writes: ["docs/v{{version}}/dev/"]
     artifact:
-      path: "docs/dev/{{story}}-r{{round}}.md"
+      path: "docs/v{{version}}/dev/{{story}}-r{{round}}.md"
       template: developer
       required_sections: ["变更", "自测", "SQL"]
     run_checks: ["project-test", "guards"]
   tester:
     agent: codex-review
-    writes: ["docs/test/"]
+    writes: ["docs/v{{version}}/test/"]
     artifact:
-      path: "docs/test/{{story}}-r{{round}}.md"
+      path: "docs/v{{version}}/test/{{story}}-r{{round}}.md"
       template: tester
       required_sections: ["用例结果", "证据"]
       first_line: ["PASS", "FAIL"]
@@ -236,6 +236,7 @@ checks:                        # 命名的命令检查，供 run_checks 引用
 |---|---|
 | `{{story}}` | story id |
 | `{{round}}` | 当前阶段轮次（从 1 开始） |
+| `{{version}}` | story id 中的版本段（`story-0.1.0-001` → `0.1.0`），用于 `docs/v{{version}}/` 产物目录 |
 | `{{stage}}` | design / review / develop / test |
 | `{{repo}}` | 仓库绝对路径；多仓下始终是 Workspace 根 |
 | `{{workspace}}` | 同 `{{repo}}`，语义更明确 |
@@ -258,10 +259,13 @@ checks:                        # 命名的命令检查，供 run_checks 引用
 ### 5.5 story 文件格式
 
 一条 story 对应一个文件 `features/<story>.md`，文件名（去掉 `.md`）即 story id。
+story id 格式固定为 `story-<版本>-<序号>`：前缀必须是 `story`，版本为三段数字（`X.Y.Z`），
+序号为一位以上数字，如 `story-0.1.0-001`、`story-1.1.1-02`。
+`{{version}}` 即从该版本段派生，docs 产物按 `docs/v<版本>/<阶段>/` 分层。
 一个 story 可以包含多个功能，`start` 时**整个文件全部开发**，不做逐功能挑选。
 
 ```markdown
-# story-0011-001 午餐抽签
+# story-0.1.0-001 午餐抽签
 
 - 背景: 中午不知道吃什么，点一下随机抽。
 - 明确不做: 除 HTML/CSS/JS 之外的任何东西
@@ -274,9 +278,9 @@ checks:                        # 命名的命令检查，供 run_checks 引用
 
 ## 验收标准
 
-- [ ] story-0011-001-1 打开页面能看到抽签按钮
-- [ ] story-0011-001-2 点击后显示一个菜名
-- [ ] story-0011-001-3 320px 宽下无横向滚动
+- [ ] story-0.1.0-001-1 打开页面能看到抽签按钮
+- [ ] story-0.1.0-001-2 点击后显示一个菜名
+- [ ] story-0.1.0-001-3 320px 宽下无横向滚动
 ```
 
 解析规则：
@@ -303,7 +307,7 @@ checks:                        # 命名的命令检查，供 run_checks 引用
   所有角色的 prompt 只读快照，不读实时文件。
 - 执行中需求文件被改动：`status` / `check` 提示 hash 不一致；`resume --refresh-spec` 重新快照，
   验收文本有变化则回到 DESIGN 阶段重新审核。
-- 依赖：`依赖: story-0011-000` 且该 story 未验收时拒绝开始，`--ignore-deps` 可强制。
+- 依赖：`依赖: story-0.1.0-000` 且该 story 未验收时拒绝开始，`--ignore-deps` 可强制。
 - v1 一次只跑一条 story，该 story 的全部功能一起交付。
 
 ### 5.7 初始化页面（`orca-team-orchestration init --ui`）
@@ -333,7 +337,7 @@ checks:                        # 命名的命令检查，供 run_checks 引用
 ├ 角色 ───────────────────────┤     start: "..."       │
 │ ▸ designer   [design ▾]     │ roles:                 │
 │   claude ▾  sonnet-4-5 ▾    │   designer:            │
-│   写 [docs/design/]         │     agent: claude-main │
+│   写 [docs/v{{version}}/design/]         │     agent: claude-main │
 │ ▸ reviewer   [review ▾]     │ ...                    │
 │ [+ 添加角色]                │                        │
 ├ 轮次 ───────────────────────┤                        │
@@ -363,7 +367,7 @@ checks:                        # 命名的命令检查，供 run_checks 引用
   - 预设守则开关：`SQL 只追加`（选 update.sql 路径、可要求追加段以 `-- migration:` 开头）、
     `配置文件不可改`、`禁止删除 db/**`；高级模式可直接编辑守则 YAML。
 - 校验（不合格不允许保存）：角色名唯一；`agent` 引用存在；`writes` 非空且落在仓库内；
-  产物路径含 `{{story}}`/`{{round}}` 且无 `..`；阶段非空时至少一个角色；`max_rounds` ≥ 1；
+  产物路径含 `{{story}}`/`{{round}}`/`{{version}}` 且无 `..`；阶段非空时至少一个角色；`max_rounds` ≥ 1；
   守则路径在仓库内。
 - 写入：先写临时文件再原子替换；覆盖前备份为 `.orca-team-orchestration/config.yaml.bak`；只写项目配置，
   全局配置需显式 `--global`。保存后可顺手提交 `chore: orca-team-orchestration init`。
@@ -415,7 +419,7 @@ INTAKE → DESIGN ⇄ REVIEW → DEVELOP → TEST ⇄ DEVELOP → ACCEPT
 - 阶段固定，角色可换名、可增删（`flow.review: [reviewer, security-reviewer]`）。
 - 多个审核角色：全部 `PASS` 才进入开发；任一 `REJECT` 回到设计，轮次 +1。
 - 轮次按阶段分别计数；超限创建 gate，不自动重试。
-- `accept` 由协调者写 `docs/test/<story>-accept.md`，等需求方确认。
+- `accept` 由协调者写 `docs/v{{version}}/test/<story>-accept.md`，等需求方确认。
 
 ### 6.2 角色 prompt 的组成
 
@@ -570,25 +574,25 @@ interface Orchestrator {
 ```json
 {
   "version": 1,
-  "story": "story-0011-001",
+  "story": "story-0.1.0-001",
   "title": "午餐抽签",
   "runId": "…",
   "orchestrator": "orca",
   "startedAt": "2026-10-24T09:00:00Z",
   "spec": {
-    "source": "features/story-0011-001.md",
-    "snapshot": ".orca-team-orchestration/runs/story-0011-001/spec.md",
+    "source": "features/story-0.1.0-001.md",
+    "snapshot": ".orca-team-orchestration/runs/story-0.1.0-001/spec.md",
     "sha256": "…"
   },
   "features": ["F1", "F2", "F3"],
-  "acceptance": ["story-0011-001-1", "story-0011-001-2", "story-0011-001-3"],
+  "acceptance": ["story-0.1.0-001-1", "story-0.1.0-001-2", "story-0.1.0-001-3"],
   "stages": {
-    "design":  { "round": 2, "status": "passed", "artifact": "docs/design/story-0011-001-r2.md" },
-    "review":  { "round": 2, "status": "passed", "artifact": "docs/review/story-0011-001-r2.md" },
+    "design":  { "round": 2, "status": "passed", "artifact": "docs/v0.1.0/design/story-0.1.0-001-r2.md" },
+    "review":  { "round": 2, "status": "passed", "artifact": "docs/v0.1.0/review/story-0.1.0-001-r2.md" },
     "develop": { "round": 1, "status": "running" }
   },
   "history": [
-    { "stage": "review", "round": 1, "outcome": "reject", "report": "docs/review/story-0011-001-r1.md" }
+    { "stage": "review", "round": 1, "outcome": "reject", "report": "docs/v0.1.0/review/story-0.1.0-001-r1.md" }
   ]
 }
 ```
@@ -651,7 +655,7 @@ interface Orchestrator {
 | 编码 | 所有读写显式 UTF-8 |
 
 CI 矩阵：`ubuntu-latest` / `macos-latest` / `windows-latest` × Node 20 / 22。
-Orca 端到端测试只在 Linux 且 `ORCA_E2E=1` 时运行；其余平台使用 fake `orca-ide` 做依赖和 CLI 编排测试。
+Orca 端到端测试在 `ORCA_E2E=1` 且本机检测到 Orca CLI 时运行；其余环境使用 fake `orca-ide` 做依赖和 CLI 编排测试。
 
 ## 12. 目录结构
 
@@ -697,7 +701,7 @@ orca-team-orchestration/
     runs/                 # 忽略（含每条 story 的 spec.md 快照）
     approvals/            # 提交
   features/               # 需求方维护，一条 story 一个 <story>.md
-  docs/{design,review,dev,test}/
+  docs/v<版本>/{design,review,dev,test}/   # 按需求版本分层，运行时自动创建
   AGENTS.md               # 追加工具指针段
 ```
 

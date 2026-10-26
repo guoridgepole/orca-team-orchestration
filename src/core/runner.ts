@@ -9,7 +9,7 @@ import {
 import { settleViolations } from './approvals.js';
 import { runRoleCommandChecks } from './commands.js';
 import type { Config } from './config.js';
-import { stageRoles } from './config.js';
+import { checkpointManagedPaths, stageRoles } from './config.js';
 import { EXIT } from './errors.js';
 import { checkpointCommits } from './git.js';
 import { formatViolations, runGuards } from './guards.js';
@@ -228,7 +228,7 @@ async function runStage(options: RunnerOptions, stage: string): Promise<StageOut
     log(`完成 ${stage} ${roleName} r${round}：${result.outcome}${result.summary ? ` — ${result.summary}` : ''}`);
 
     const artifactIssues = artifactIssuesForRole(root, config, roleName, state.story, round);
-    const scope = scopeIssuesForWorkspace(layout, config, stage, scopeIgnore);
+    const scope = scopeIssuesForWorkspace(layout, config, stage, state.story, scopeIgnore);
     const guards = settleViolations(root, runGuards(root, config.guards, { layout }), layout).blocking;
     const commands = runRoleCommandChecks(root, config, roleName, stage, state.story, round);
     const issues = [...artifactIssues, ...scope, ...commands.issues];
@@ -303,7 +303,7 @@ async function runStage(options: RunnerOptions, stage: string): Promise<StageOut
   writeState(root, state);
   if (config.runtime.checkpoint_commits) {
     const commits = checkpointCommits(layout, `stage: ${stage} ${state.story} r${round}`, {
-      managedPaths: [config.project.paths.features_dir, config.project.paths.docs, config.project.paths.evidence],
+      managedPaths: checkpointManagedPaths(config, state.story),
     });
     for (const commit of commits) log(`检查点提交 ${commit.repo}@${commit.sha}`);
   }

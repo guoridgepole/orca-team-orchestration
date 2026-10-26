@@ -124,7 +124,7 @@ export function detectProject(root: string): Detection {
       source,
       tests,
       db: dbPath,
-      evidence: 'docs/test/evidence',
+      evidence: 'docs/v{{version}}/test/evidence',
     },
     guards: guardList,
   };
@@ -146,11 +146,7 @@ export function initProject(options: InitOptions): InitResult {
   const created: string[] = [];
   const dirs = [
     config.project.paths.features_dir,
-    path.join(config.project.paths.docs, 'design'),
-    path.join(config.project.paths.docs, 'review'),
-    path.join(config.project.paths.docs, 'dev'),
-    path.join(config.project.paths.docs, 'test'),
-    config.project.paths.evidence,
+    config.project.paths.docs,
     '.orca-team-orchestration/runs',
     '.orca-team-orchestration/approvals',
   ];
@@ -371,7 +367,7 @@ export function initWorkspace(options: WorkspaceInitOptions): WorkspaceInitResul
     source: detections.flatMap((item) => item.source),
     tests: detections.flatMap((item) => item.tests),
     db: dbPaths.length === 1 ? dbPaths[0]! : null,
-    evidence: 'docs/test/evidence',
+    evidence: 'docs/v{{version}}/test/evidence',
   };
   config.runtime.worktree = 'path:.';
   config.guards = detections.flatMap((item) => item.guards);
@@ -382,11 +378,7 @@ export function initWorkspace(options: WorkspaceInitOptions): WorkspaceInitResul
   const created: string[] = [];
   const dirs = [
     config.project.paths.features_dir,
-    path.join(config.project.paths.docs, 'design'),
-    path.join(config.project.paths.docs, 'review'),
-    path.join(config.project.paths.docs, 'dev'),
-    path.join(config.project.paths.docs, 'test'),
-    config.project.paths.evidence,
+    config.project.paths.docs,
     '.orca-team-orchestration/runs',
     '.orca-team-orchestration/approvals',
   ];

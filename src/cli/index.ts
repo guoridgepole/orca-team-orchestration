@@ -7,8 +7,8 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { minimatch } from 'minimatch';
 import { parseArgs, flagBool, flagList, flagString, type ParsedArgs } from './args.js';
 import {
+  checkpointManagedPaths,
   configToYaml,
-  isStoryId,
   loadConfig,
   projectConfigPath,
   stageRoles,
@@ -25,7 +25,7 @@ import { findRepoRoot, readText, writeText } from '../core/paths.js';
 import { checkpointCommit, checkpointCommits, gitCommit, gitHasHead, headCommit, headCommits, runGit } from '../core/git.js';
 import { formatViolations, runGuards, type Violation } from '../core/guards.js';
 import { initProject, initWorkspace } from '../core/init.js';
-import { agentBinary, findExecutable, ORCA_INSTALL_HINT, requireAgentAvailable, requireOrca } from '../core/orca.js';
+import { agentBinary, findExecutable, ORCA_INSTALL_HINT, requireAgentAvailable, requireOrca, resolveOrcaBinary } from '../core/orca.js';
 import { runStory } from '../core/runner.js';
 import { OrcaAdapter } from '../adapters/orca/adapter.js';
 import { startUiServer } from '../ui/server.js';
@@ -51,7 +51,9 @@ import {
   loadStory,
   newStorySkeleton,
   parseStoryContent,
+  requireVersion,
   storyPath,
+  versionFromStory,
   StoryLintError,
   type StoryIssue,
 } from '../core/story.js';
@@ -110,10 +112,6 @@ function workspaceLayoutFor(root: string, config: Config): WorkspaceLayout | und
   return validateWorkspace(root, config);
 }
 
-function checkpointManagedPaths(config: Config): string[] {
-  return [config.project.paths.features_dir, config.project.paths.docs, config.project.paths.evidence];
-}
-
 function printCommits(commits: { repo: string; sha: string }[], layout: WorkspaceLayout | undefined): void {
   for (const commit of commits) {
     out(layout ? `检查点提交 ${commit.repo}@${commit.sha}` : `检查点提交 ${commit.sha}`);
@@ -159,10 +157,14 @@ function parseRound(raw: string | undefined, fallback: number): number {
 
 function latestRound(root: string, config: Config, stage: string, story: string): number {
   let max = 0;
+  const version = versionFromStory(story) ?? '{{version}}';
   for (const roleName of stageRoles(config, stage)) {
     const role = config.roles[roleName];
     if (!role) continue;
-    const relPattern = role.artifact.path.replaceAll('{{story}}', story).replaceAll('{{round}}', '*');
+    const relPattern = role.artifact.path
+      .replaceAll('{{story}}', story)
+      .replaceAll('{{round}}', '*')
+      .replaceAll('{{version}}', version);
     const dir = path.join(root, path.dirname(relPattern));
     const filePattern = path.basename(relPattern);
     if (!fs.existsSync(dir)) continue;
@@ -344,7 +346,7 @@ async function cmdConfig(args: ParsedArgs): Promise<number> {
 async function cmdNew(args: ParsedArgs): Promise<number> {
   const root = repoRootFrom(args);
   const story = requirePositional(args, 0, 'orca-team-orchestration new <story> [--title 标题]');
-  if (!isStoryId(story)) throw new CliError(EXIT.usage, `story id 非法：${story}`);
+  requireVersion(story);
   const config = loadConfig(root);
   const file = storyPath(root, config.project.paths.features_dir, story);
   if (fs.existsSync(file)) {
@@ -624,8 +626,12 @@ async function cmdAccept(args: ParsedArgs): Promise<number> {
   }
 
   const parsed = loadStory(root, config.project.paths.features_dir, story);
+  const version = requireVersion(story);
   const now = new Date().toISOString();
-  const relative = path.join(config.project.paths.docs, 'test', `${story}-accept.md`).split(path.sep).join('/');
+  const relative = path
+    .join(config.project.paths.docs, `v${version}`, 'test', `${story}-accept.md`)
+    .split(path.sep)
+    .join('/');
   const lines = [
     `# ACCEPT ${story} ${state.title}`,
     '',
@@ -648,7 +654,7 @@ async function cmdAccept(args: ParsedArgs): Promise<number> {
   if (config.runtime.checkpoint_commits) {
     if (layout) {
       const commits = checkpointCommits(layout, `accept: ${story}`, {
-        managedPaths: checkpointManagedPaths(config),
+        managedPaths: checkpointManagedPaths(config, story),
       });
       printCommits(commits, layout);
     } else {
@@ -849,7 +855,9 @@ async function cmdCheck(args: ParsedArgs): Promise<number> {
   const rounds = parseRound(flagString(args, 'round'), state?.stages[stage]?.round ?? fallbackRound);
 
   const artifact = artifactIssues(root, config, stage, story, rounds);
-  const scope = layout ? scopeIssuesForWorkspace(layout, config, stage) : scopeIssues(root, config, stage);
+  const scope = layout
+    ? scopeIssuesForWorkspace(layout, config, stage, story)
+    : scopeIssues(root, config, stage, story);
   const settled = settleViolations(
     root,
     runGuards(root, config.guards, layout ? { layout } : {}),
@@ -1079,7 +1087,7 @@ async function cmdDoctor(args: ParsedArgs): Promise<number> {
     });
   }
 
-  const orca = findExecutable('orca-ide');
+  const orca = resolveOrcaBinary();
   items.push({
     name: 'Orca',
     status: orca ? 'OK' : 'FAIL',

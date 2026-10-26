@@ -31,7 +31,7 @@ describe('examples', () => {
   }
 
   it('todo-app story declares acceptance ids with the story prefix', () => {
-    const result = runCli(['--repo', path.join(EXAMPLES_ROOT, 'todo-app'), 'lint', 'story-002', '--json']);
+    const result = runCli(['--repo', path.join(EXAMPLES_ROOT, 'todo-app'), 'lint', 'story-0.2.0-001', '--json']);
     assert.equal(result.code, EXIT.ok, result.stdout + result.stderr);
     assert.deepEqual(JSON.parse(result.stdout), []);
   });

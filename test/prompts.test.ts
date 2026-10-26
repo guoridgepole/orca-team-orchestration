@@ -121,8 +121,8 @@ test('模板目录完全缺失时使用内置系统段与通用契约', () => {
     assert.ok(snapshot.roles.every((role) => role.defaultSource === 'generic'));
     assert.ok(snapshot.warnings.some((warning) => warning.includes('未找到默认提示词模板')));
 
-    write(root, 'features/story-001.md', '需求\n');
-    const rendered = renderRolePrompt(root, loadConfig(root), 'designer', { story: 'story-001' });
+    write(root, 'features/story-0.1.0-001.md', '需求\n');
+    const rendered = renderRolePrompt(root, loadConfig(root), 'designer', { story: 'story-0.1.0-001' });
     assert.ok(rendered.prompt.includes('# System constraints'));
     assert.ok(rendered.prompt.includes('# Role contract: designer'));
     assert.ok(rendered.warnings.some((warning) => warning.includes('未找到默认提示词模板')));
@@ -310,14 +310,14 @@ runtime:
 
 test('渲染顺序、需求快照、围栏与轮次上限', () => {
   const root = project('prompt-render');
-  write(root, 'features/story-001.md', '实时需求\n');
+  write(root, 'features/story-0.1.0-001.md', '实时需求\n');
   write(
     root,
-    '.orca-team-orchestration/runs/story-001/spec.md',
+    '.orca-team-orchestration/runs/story-0.1.0-001/spec.md',
     '# 快照需求\n\n包含 `inline` 和 ``` 围栏\n',
   );
   const rendered = renderRolePrompt(root, loadConfig(root), 'designer', {
-    story: 'story-001',
+    story: 'story-0.1.0-001',
     round: 2,
   });
 
@@ -339,15 +339,15 @@ test('渲染顺序、需求快照、围栏与轮次上限', () => {
   assert.ok(!prompt.includes('实时需求'));
   assert.match(prompt, /sha256：[a-f0-9]{64}/);
   assert.match(prompt, /\n````\n/);
-  assert.match(prompt, /docs\/design\/story-001-r2\.md/);
+  assert.match(prompt, /docs\/v0.1.0\/design\/story-0.1.0-001-r2\.md/);
   assert.match(prompt, /轮次：2 \/ 上限 3/);
   assert.equal(rendered.warnings.some((warning) => warning.includes('实时')), false);
 });
 
 test('缺少需求快照时读取实时文件并给出 warning', () => {
   const root = project('prompt-live');
-  write(root, 'features/story-001.md', '实时需求内容\n');
-  const rendered = renderRolePrompt(root, loadConfig(root), 'designer', { story: 'story-001' });
+  write(root, 'features/story-0.1.0-001.md', '实时需求内容\n');
+  const rendered = renderRolePrompt(root, loadConfig(root), 'designer', { story: 'story-0.1.0-001' });
   assert.ok(rendered.prompt.includes('实时需求内容'));
   assert.ok(rendered.warnings.some((warning) => warning.includes('需求快照不存在')));
 });
@@ -362,36 +362,36 @@ test('项目规则追加在提示词末尾', () => {
 
 test('上一轮报告可以显式传入或从运行状态读取', () => {
   const root = project('prompt-previous');
-  write(root, 'features/story-001.md', '需求\n');
-  write(root, 'docs/review/story-001-r1.md', '旧报告内容\n');
+  write(root, 'features/story-0.1.0-001.md', '需求\n');
+  write(root, 'docs/review/story-0.1.0-001-r1.md', '旧报告内容\n');
 
   const explicit = renderRolePrompt(root, loadConfig(root), 'reviewer', {
-    story: 'story-001',
+    story: 'story-0.1.0-001',
     round: 1,
-    previousArtifact: 'docs/review/story-001-r1.md',
+    previousArtifact: 'docs/review/story-0.1.0-001-r1.md',
   });
   assert.match(explicit.prompt, /### 上一轮报告/);
   assert.match(explicit.prompt, /旧报告内容/);
 
   write(
     root,
-    '.orca-team-orchestration/runs/story-001.json',
+    '.orca-team-orchestration/runs/story-0.1.0-001.json',
     JSON.stringify({
       version: 1,
-      story: 'story-001',
+      story: 'story-0.1.0-001',
       title: 'demo',
       runId: 'run-1',
       orchestrator: 'orca',
       startedAt: '2026-01-01T00:00:00.000Z',
-      spec: { source: 'features/story-001.md', snapshot: 'spec.md', sha256: '0'.repeat(64) },
+      spec: { source: 'features/story-0.1.0-001.md', snapshot: 'spec.md', sha256: '0'.repeat(64) },
       features: [],
       acceptance: [],
       stages: {},
-      history: [{ stage: 'review', round: 1, outcome: 'rejected', report: 'docs/review/story-001-r1.md' }],
+      history: [{ stage: 'review', round: 1, outcome: 'rejected', report: 'docs/review/story-0.1.0-001-r1.md' }],
     }),
   );
   const automatic = renderRolePrompt(root, loadConfig(root), 'reviewer', {
-    story: 'story-001',
+    story: 'story-0.1.0-001',
     round: 2,
   });
   assert.match(automatic.prompt, /旧报告内容/);
@@ -405,8 +405,8 @@ test('未进入 flow 的角色渲染为 unassigned 并给出 warning', () => {
       artifact: { path: 'docs/extra/{{story}}.md' },
     };
   });
-  write(root, 'features/story-001.md', '需求\n');
-  const rendered = renderRolePrompt(root, loadConfig(root), 'extra', { story: 'story-001' });
+  write(root, 'features/story-0.1.0-001.md', '需求\n');
+  const rendered = renderRolePrompt(root, loadConfig(root), 'extra', { story: 'story-0.1.0-001' });
   assert.equal(rendered.stage, 'unassigned');
   assert.ok(rendered.warnings.some((warning) => warning.includes('未进入 flow')));
 });
@@ -423,7 +423,7 @@ test('未知角色或与该角色不匹配的阶段被拒绝', () => {
     (error) => isPromptError(error, 'invalid'),
   );
   assert.throws(
-    () => renderRolePrompt(root, config, 'designer', { story: 'story-001' }),
+    () => renderRolePrompt(root, config, 'designer', { story: 'story-0.1.0-001' }),
     (error) => isPromptError(error, 'invalid'),
   );
 });

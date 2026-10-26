@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { AGENT_KINDS } from '../../core/config.js';
 import { CliError, EXIT } from '../../core/errors.js';
-import { findExecutable } from '../../core/orca.js';
+import { resolveOrcaBinary } from '../../core/orca.js';
 import type {
   DispatchHandle,
   DispatchPlan,
@@ -168,9 +168,9 @@ export class OrcaAdapter implements Orchestrator {
   private queue: MessageBatch[] = [];
 
   constructor(options: OrcaAdapterOptions) {
-    const binary = options.binary ?? process.env.ORCA_TEAM_ORCHESTRATION_ORCA ?? findExecutable('orca-ide');
+    const binary = resolveOrcaBinary(options.binary);
     if (!binary) {
-      throw new CliError(EXIT.orchestrator, '未检测到 orca-ide；请先安装 Orca 并确保命令在 PATH 中');
+      throw new CliError(EXIT.orchestrator, '未检测到 Orca CLI（orca-ide / orca）；请先安装 Orca 并确保命令在 PATH 中，或设置 ORCA_TEAM_ORCHESTRATION_ORCA');
     }
     this.binary = binary;
     this.repoRoot = options.repoRoot;

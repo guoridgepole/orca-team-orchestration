@@ -81,7 +81,7 @@ class StubOrchestrator implements Orchestrator {
     const resuming = !this.dispatches.some(
       (p) => p.stage === parsed.stage && p.role === parsed.role && p.round === parsed.round,
     );
-    const result = this.worker({ ...parsed, story: 'story-001', resuming });
+    const result = this.worker({ ...parsed, story: 'story-0.1.0-001', resuming });
     if (result.outcome === 'succeeded' || result.outcome === 'failed') this.released.push(handle);
     return result;
   }
@@ -96,7 +96,7 @@ class StubOrchestrator implements Orchestrator {
 }
 
 function designArtifact(d: WaitDescriptor): string {
-  return `# 设计 r${d.round}\n\n## 目标\n\n抽签。\n\n## 验收映射\n\n- story-001-1\n\n## 数据库变更\n\n无。\n\n## 失败路径\n\n无菜可选。\n\n## 回滚\n\n删除页面。\n`;
+  return `# 设计 r${d.round}\n\n## 目标\n\n抽签。\n\n## 验收映射\n\n- story-0.1.0-001-1\n\n## 数据库变更\n\n无。\n\n## 失败路径\n\n无菜可选。\n\n## 回滚\n\n删除页面。\n`;
 }
 
 function reviewArtifact(verdict: string, d: WaitDescriptor): string {
@@ -127,10 +127,10 @@ function setupRepo(config: Config): { root: string; state: RunState } {
   const root = tempRepo('runner');
   write(root, 'package.json', JSON.stringify({ scripts: { dev: 'node app.js', test: 'node --test' } }));
   write(root, 'app.js', 'console.log("hi");\n');
-  write(root, `features/story-001.md`, VALID_STORY);
+  write(root, `features/story-0.1.0-001.md`, VALID_STORY);
   commitAll(root, 'baseline');
-  const parsed = loadStory(root, config.project.paths.features_dir, 'story-001');
-  const spec = snapshotSpec(root, 'story-001', VALID_STORY);
+  const parsed = loadStory(root, config.project.paths.features_dir, 'story-0.1.0-001');
+  const spec = snapshotSpec(root, 'story-0.1.0-001', VALID_STORY);
   const state = buildRunState(config, parsed, spec, 'orca');
   writeState(root, state);
   return { root, state };
@@ -169,8 +169,8 @@ describe('runner 阶段闭环', () => {
       assert.equal(result.state.stages.test?.status, 'passed');
       assert.match(logs.join('\n'), /等待需求方验收/);
       assert.equal(orchestrator.createRunCalls, 1);
-      assert.match(gitLog(root), /stage: design story-001 r1/);
-      assert.match(gitLog(root), /stage: test story-001 r1/);
+      assert.match(gitLog(root), /stage: design story-0.1.0-001 r1/);
+      assert.match(gitLog(root), /stage: test story-0.1.0-001 r1/);
     } finally {
       cleanup(root);
     }
@@ -271,7 +271,7 @@ describe('runner 阶段闭环', () => {
       assert.equal(result.exitCode, EXIT.gate);
       assert.equal(result.state.gate?.stage, 'design');
       assert.match(logs.join('\n'), /COMMAND FAIL/);
-      const logFile = path.join(root, '.orca-team-orchestration', 'runs', 'story-001', 'checks', 'design-r1-designer-fail.log');
+      const logFile = path.join(root, '.orca-team-orchestration', 'runs', 'story-0.1.0-001', 'checks', 'design-r1-designer-fail.log');
       assert.ok(fs.existsSync(logFile), '命令日志应写入 runs/checks');
     } finally {
       cleanup(root);
@@ -344,11 +344,11 @@ function setupWorkspace(): { root: string; api: string; config: Config; state: R
   const config = workspaceConfig({
     project: { paths: { source: ['api/src/**'], tests: ['api/test/**'] } },
   });
-  write(ws.root, `features/story-001.md`, VALID_STORY);
-  runGit(ws.root, ['add', 'features/story-001.md']);
+  write(ws.root, `features/story-0.1.0-001.md`, VALID_STORY);
+  runGit(ws.root, ['add', 'features/story-0.1.0-001.md']);
   runGit(ws.root, ['commit', '-q', '-m', 'baseline']);
-  const parsed = loadStory(ws.root, config.project.paths.features_dir, 'story-001');
-  const spec = snapshotSpec(ws.root, 'story-001', VALID_STORY, config.project.paths.features_dir);
+  const parsed = loadStory(ws.root, config.project.paths.features_dir, 'story-0.1.0-001');
+  const spec = snapshotSpec(ws.root, 'story-0.1.0-001', VALID_STORY, config.project.paths.features_dir);
   const state = buildRunState(config, parsed, spec, 'orca');
   writeState(ws.root, state);
   return { root: ws.root, api: ws.api, config, state };
@@ -367,8 +367,8 @@ describe('runner 多仓', () => {
       const output = logs.join('\n');
       assert.match(output, /检查点提交 workspace@/);
       assert.match(output, /检查点提交 api@/);
-      assert.match(gitLog(root), /stage: develop story-001 r1/);
-      assert.match(gitLog(api), /stage: develop story-001 r1/);
+      assert.match(gitLog(root), /stage: develop story-0.1.0-001 r1/);
+      assert.match(gitLog(api), /stage: develop story-0.1.0-001 r1/);
     } finally {
       cleanup(root);
     }
@@ -386,7 +386,7 @@ describe('runner 多仓', () => {
       assert.equal(result.exitCode, EXIT.gate);
       assert.equal(result.state.gate?.stage, 'develop');
       assert.match(logs.join('\n'), /SCOPE FAIL.*api\/secret\.txt/);
-      assert.doesNotMatch(gitLog(api), /stage: develop story-001 r1/);
+      assert.doesNotMatch(gitLog(api), /stage: develop story-0.1.0-001 r1/);
     } finally {
       cleanup(root);
     }

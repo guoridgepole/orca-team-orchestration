@@ -64,7 +64,7 @@ describe('init → new → lint → start → status', () => {
   it('requires Orca before writing any project files', () => {
     const withoutOrca = fs.mkdtempSync(path.join(os.tmpdir(), 'orca-team-orchestration-no-orca-'));
     supportDirs.push(withoutOrca);
-    const missing = cli(root, ['--repo', root, 'init'], { PATH: withoutOrca });
+    const missing = cli(root, ['--repo', root, 'init'], { PATH: withoutOrca, ORCA_TEAM_ORCHESTRATION_ORCA: '' });
 
     assert.equal(missing.code, EXIT.orchestrator, missing.stderr);
     assert.match(missing.stderr, /必须依赖 Orca/);
@@ -97,33 +97,33 @@ describe('init → new → lint → start → status', () => {
   });
 
   it('creates a story skeleton that fails lint until it is filled in', () => {
-    const created = cli(root, ['new', 'story-001', '--title', '午餐抽签']);
+    const created = cli(root, ['new', 'story-0.1.0-001', '--title', '午餐抽签']);
     assert.equal(created.code, EXIT.ok, created.stderr);
-    assert.ok(fs.existsSync(path.join(root, 'features/story-001.md')));
+    assert.ok(fs.existsSync(path.join(root, 'features/story-0.1.0-001.md')));
 
-    const lint = cli(root, ['lint', 'story-001']);
+    const lint = cli(root, ['lint', 'story-0.1.0-001']);
     assert.equal(lint.code, EXIT.config);
     assert.match(lint.stdout, /第 \d+ 行/);
   });
 
   it('lints a filled story and lists it as 未开始', () => {
-    write(root, 'features/story-001.md', VALID_STORY);
+    write(root, 'features/story-0.1.0-001.md', VALID_STORY);
 
-    assert.equal(cli(root, ['lint', 'story-001']).code, EXIT.ok);
+    assert.equal(cli(root, ['lint', 'story-0.1.0-001']).code, EXIT.ok);
 
     const listed = cli(root, ['list', '--json']);
     assert.equal(listed.code, EXIT.ok, listed.stderr);
     const rows = JSON.parse(listed.stdout) as Array<{ id: string; status: string; features: number }>;
-    assert.equal(rows[0]?.id, 'story-001');
+    assert.equal(rows[0]?.id, 'story-0.1.0-001');
     assert.equal(rows[0]?.status, '未开始');
     assert.equal(rows[0]?.features, 2);
   });
 
   it('does not persist a run on --dry-run', () => {
-    const dry = cli(root, ['start', 'story-001', '--dry-run', '--orchestrator', 'orca']);
+    const dry = cli(root, ['start', 'story-0.1.0-001', '--dry-run', '--orchestrator', 'orca']);
     assert.equal(dry.code, EXIT.ok, dry.stderr);
     assert.match(dry.stdout, /DRY-RUN/);
-    assert.equal(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-001.json')), false);
+    assert.equal(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-0.1.0-001.json')), false);
   });
 
   it('requires Orca in auto mode instead of falling back', () => {
@@ -131,17 +131,17 @@ describe('init → new → lint → start → status', () => {
     supportDirs.push(withoutOrca);
     const result = cli(
       root,
-      ['--repo', root, 'start', 'story-001', '--dry-run', '--orchestrator', 'auto'],
-      { PATH: withoutOrca },
+      ['--repo', root, 'start', 'story-0.1.0-001', '--dry-run', '--orchestrator', 'auto'],
+      { PATH: withoutOrca, ORCA_TEAM_ORCHESTRATION_ORCA: '' },
     );
 
     assert.equal(result.code, EXIT.orchestrator, result.stderr);
     assert.match(result.stderr, /必须依赖 Orca/);
-    assert.equal(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-001.json')), false);
+    assert.equal(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-0.1.0-001.json')), false);
   });
 
   it('rejects the unsupported sequential orchestrator', () => {
-    const result = cli(root, ['start', 'story-001', '--dry-run', '--orchestrator', 'sequential']);
+    const result = cli(root, ['start', 'story-0.1.0-001', '--dry-run', '--orchestrator', 'sequential']);
 
     assert.equal(result.code, EXIT.usage);
     assert.match(result.stderr, /必须依赖 Orca/);
@@ -151,58 +151,58 @@ describe('init → new → lint → start → status', () => {
     // 只保留 fake orca-ide 与 git 所在目录，确定性模拟“本机未安装 claude/codex”
     const git = findExecutable('git');
     const noAgentPath = [fakeOrcaDir, ...(git ? [path.dirname(git)] : [])].join(path.delimiter);
-    const result = cli(root, ['start', 'story-001', '--orchestrator', 'orca'], { PATH: noAgentPath });
+    const result = cli(root, ['start', 'story-0.1.0-001', '--orchestrator', 'orca'], { PATH: noAgentPath });
     assert.equal(result.code, EXIT.agent, result.stderr);
     assert.match(result.stderr, /未检测到 agent 命令 claude/);
-    assert.equal(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-001.json')), false);
+    assert.equal(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-0.1.0-001.json')), false);
   });
 
   it('start 打开 run 后因 fake orchestrator 无法解析 run id 而退出 4', () => {
-    const started = cli(root, ['start', 'story-001', '--orchestrator', 'orca']);
+    const started = cli(root, ['start', 'story-0.1.0-001', '--orchestrator', 'orca']);
     assert.equal(started.code, EXIT.orchestrator, started.stderr);
-    assert.ok(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-001.json')));
-    assert.ok(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-001/spec.md')));
+    assert.ok(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-0.1.0-001.json')));
+    assert.ok(fs.existsSync(path.join(root, '.orca-team-orchestration/runs/story-0.1.0-001/spec.md')));
   });
 
   it('reports stage, next step and snapshot drift', () => {
-    const status = cli(root, ['status', 'story-001', '--json']);
+    const status = cli(root, ['status', 'story-0.1.0-001', '--json']);
     assert.equal(status.code, EXIT.ok, status.stderr);
     const payload = JSON.parse(status.stdout) as { status: string; next: string; specChanged: boolean };
     assert.equal(payload.status, '进行中');
     assert.equal(payload.next, 'design');
     assert.equal(payload.specChanged, false);
 
-    fs.appendFileSync(path.join(root, 'features/story-001.md'), '\n补充说明\n');
-    const drifted = cli(root, ['status', 'story-001', '--json']);
+    fs.appendFileSync(path.join(root, 'features/story-0.1.0-001.md'), '\n补充说明\n');
+    const drifted = cli(root, ['status', 'story-0.1.0-001', '--json']);
     assert.equal((JSON.parse(drifted.stdout) as { specChanged: boolean }).specChanged, true);
   });
 
   it('passes the design stage check only when the artifact is complete', () => {
-    write(root, 'features/story-001.md', VALID_STORY);
+    write(root, 'features/story-0.1.0-001.md', VALID_STORY);
     commitAll(root, 'story: filled');
 
-    const missing = cli(root, ['check', 'design', 'story-001']);
+    const missing = cli(root, ['check', 'design', 'story-0.1.0-001']);
     assert.equal(missing.code, EXIT.validation);
     assert.match(missing.stdout, /ARTIFACT FAIL/);
 
     write(
       root,
-      'docs/design/story-001-r1.md',
-      '# 目标\n\n## 目标\n\n抽签。\n\n## 验收映射\n\n- story-001-1\n- story-001-2\n\n## 数据库变更\n\n无。\n\n## 失败路径\n\n无菜可选。\n\n## 回滚\n\n删除页面。\n',
+      'docs/v0.1.0/design/story-0.1.0-001-r1.md',
+      '# 目标\n\n## 目标\n\n抽签。\n\n## 验收映射\n\n- story-0.1.0-001-1\n- story-0.1.0-001-2\n\n## 数据库变更\n\n无。\n\n## 失败路径\n\n无菜可选。\n\n## 回滚\n\n删除页面。\n',
     );
-    const passed = cli(root, ['check', 'design', 'story-001']);
+    const passed = cli(root, ['check', 'design', 'story-0.1.0-001']);
     assert.equal(passed.code, EXIT.ok, passed.stdout + passed.stderr);
     assert.match(passed.stdout, /STAGE-CHECK: PASS/);
   });
 
   it('renders a full role prompt as text or JSON', () => {
-    const text = cli(root, ['render', 'designer', 'story-001', '--round', '2']);
+    const text = cli(root, ['render', 'designer', 'story-0.1.0-001', '--round', '2']);
     assert.equal(text.code, EXIT.ok, text.stderr);
     assert.match(text.stdout, /oto prompt v1 role=designer stage=design round=2/);
     assert.match(text.stdout, /## 需求数据/);
-    assert.match(text.stdout, /docs\/design\/story-001-r2\.md/);
+    assert.match(text.stdout, /docs\/v0.1.0\/design\/story-0.1.0-001-r2\.md/);
 
-    const json = cli(root, ['render', 'designer', 'story-001', '--round', '2', '--json']);
+    const json = cli(root, ['render', 'designer', 'story-0.1.0-001', '--round', '2', '--json']);
     assert.equal(json.code, EXIT.ok, json.stderr);
     const payload = JSON.parse(json.stdout) as {
       role: string;
@@ -221,15 +221,15 @@ describe('init → new → lint → start → status', () => {
   });
 
   it('renders a previous report from --previous', () => {
-    write(root, 'docs/review/story-001-r1.md', '上一轮发现：缺少失败路径。\n');
+    write(root, 'docs/v0.1.0/review/story-0.1.0-001-r1.md', '上一轮发现：缺少失败路径。\n');
     const result = cli(root, [
       'render',
       'reviewer',
-      'story-001',
+      'story-0.1.0-001',
       '--round',
       '2',
       '--previous',
-      'docs/review/story-001-r1.md',
+      'docs/v0.1.0/review/story-0.1.0-001-r1.md',
     ]);
     assert.equal(result.code, EXIT.ok, result.stderr);
     assert.match(result.stdout, /上一轮报告/);
@@ -237,11 +237,11 @@ describe('init → new → lint → start → status', () => {
   });
 
   it('rejects unknown roles and missing stories', () => {
-    const unknown = cli(root, ['render', 'nope', 'story-001']);
+    const unknown = cli(root, ['render', 'nope', 'story-0.1.0-001']);
     assert.equal(unknown.code, EXIT.usage);
     assert.match(unknown.stderr, /未知角色/);
 
-    const missing = cli(root, ['render', 'designer', 'missing-001']);
+    const missing = cli(root, ['render', 'designer', 'story-9.9.9-001']);
     assert.equal(missing.code, EXIT.usage);
     assert.match(missing.stderr, /不存在/);
   });
@@ -282,18 +282,27 @@ describe('usage and argument errors', () => {
     assert.equal(result.code, EXIT.usage);
     assert.match(result.stderr, /显式指定 story/);
   });
+
+  it('new 拒绝不符合 story-<版本>-<序号> 格式的 id', () => {
+    const root = repo();
+    assert.equal(cli(root, ['init']).code, EXIT.ok);
+    const bad = cli(root, ['new', 'story-abc']);
+    assert.equal(bad.code, EXIT.usage);
+    assert.match(bad.stderr, /格式：story-<版本>-<序号>/);
+    assert.equal(fs.existsSync(path.join(root, 'features/story-abc.md')), false);
+  });
 });
 
 describe('resume 与 accept', () => {
   const stateFile = (root: string): string =>
-    path.join(root, '.orca-team-orchestration', 'runs', 'story-001.json');
+    path.join(root, '.orca-team-orchestration', 'runs', 'story-0.1.0-001.json');
 
   function startedRepo(): string {
     const root = repo();
     assert.equal(cli(root, ['init']).code, EXIT.ok);
-    write(root, 'features/story-001.md', VALID_STORY);
+    write(root, 'features/story-0.1.0-001.md', VALID_STORY);
     commitAll(root, 'story: filled');
-    const start = cli(root, ['start', 'story-001', '--orchestrator', 'orca']);
+    const start = cli(root, ['start', 'story-0.1.0-001', '--orchestrator', 'orca']);
     assert.equal(start.code, EXIT.orchestrator, start.stderr);
     return root;
   }
@@ -311,16 +320,16 @@ describe('resume 与 accept', () => {
   it('resume 在需求漂移时要求 --refresh-spec', () => {
     const root = startedRepo();
     const drifted = VALID_STORY.replace('- 明确不做:', '- 背景补充: 漂移说明\n- 明确不做:');
-    write(root, 'features/story-001.md', drifted);
+    write(root, 'features/story-0.1.0-001.md', drifted);
 
-    const blocked = cli(root, ['resume', 'story-001']);
+    const blocked = cli(root, ['resume', 'story-0.1.0-001']);
     assert.equal(blocked.code, EXIT.config, blocked.stderr);
     assert.match(blocked.stderr, /--refresh-spec/);
 
-    const refreshed = cli(root, ['resume', 'story-001', '--refresh-spec']);
+    const refreshed = cli(root, ['resume', 'story-0.1.0-001', '--refresh-spec']);
     assert.equal(refreshed.code, EXIT.orchestrator, refreshed.stderr);
 
-    const status = cli(root, ['status', 'story-001', '--json']);
+    const status = cli(root, ['status', 'story-0.1.0-001', '--json']);
     assert.equal((JSON.parse(status.stdout) as { specChanged: boolean }).specChanged, false);
   });
 
@@ -328,20 +337,20 @@ describe('resume 与 accept', () => {
     const root = startedRepo();
     markAllPassed(root);
 
-    const accepted = cli(root, ['accept', 'story-001']);
+    const accepted = cli(root, ['accept', 'story-0.1.0-001']);
     assert.equal(accepted.code, EXIT.ok, accepted.stderr);
-    assert.ok(fs.existsSync(path.join(root, 'docs/test/story-001-accept.md')));
+    assert.ok(fs.existsSync(path.join(root, 'docs/v0.1.0/test/story-0.1.0-001-accept.md')));
     const state = JSON.parse(fs.readFileSync(stateFile(root), 'utf8')) as { acceptedAt?: string };
     assert.ok(state.acceptedAt, 'accept 应写入 acceptedAt');
 
-    const again = cli(root, ['accept', 'story-001']);
+    const again = cli(root, ['accept', 'story-0.1.0-001']);
     assert.equal(again.code, EXIT.ok, again.stderr);
     assert.match(again.stdout, /已.*验收/);
   });
 
   it('accept 在阶段未完成时拒绝', () => {
     const root = startedRepo();
-    const result = cli(root, ['accept', 'story-001']);
+    const result = cli(root, ['accept', 'story-0.1.0-001']);
     assert.equal(result.code, EXIT.validation, result.stderr);
     assert.match(result.stderr, /尚未完成所有阶段/);
   });
@@ -392,24 +401,24 @@ describe('explain', () => {
     write(root, 'package.json', JSON.stringify({ scripts: { dev: 'node app.js', test: 'node --test' } }));
     commitAll(root, 'baseline');
     assert.equal(cli(root, ['init']).code, EXIT.ok);
-    write(root, 'features/story-001.md', VALID_STORY);
+    write(root, 'features/story-0.1.0-001.md', VALID_STORY);
     commitAll(root, 'story: filled');
 
-    const notStarted = cli(root, ['explain', 'story-001', '--json']);
+    const notStarted = cli(root, ['explain', 'story-0.1.0-001', '--json']);
     assert.equal(notStarted.code, EXIT.ok, notStarted.stderr);
     const before = JSON.parse(notStarted.stdout) as { next: string; status: string; actions: string[] };
     assert.equal(before.next, 'start');
     assert.equal(before.status, '未开始');
     assert.ok(before.actions.some((line) => line.includes('lint')));
 
-    assert.equal(cli(root, ['start', 'story-001', '--orchestrator', 'orca']).code, EXIT.orchestrator);
-    const running = cli(root, ['explain', 'story-001', '--json']);
+    assert.equal(cli(root, ['start', 'story-0.1.0-001', '--orchestrator', 'orca']).code, EXIT.orchestrator);
+    const running = cli(root, ['explain', 'story-0.1.0-001', '--json']);
     const mid = JSON.parse(running.stdout) as { next: string; round: number; reasons: string[] };
     assert.equal(mid.next, 'design');
     assert.equal(mid.round, 1);
-    assert.match(mid.reasons.join('\n'), /docs\/design\/story-001-r1\.md/);
+    assert.match(mid.reasons.join('\n'), /docs\/v0.1.0\/design\/story-0.1.0-001-r1\.md/);
 
-    const stateFile = path.join(root, '.orca-team-orchestration', 'runs', 'story-001.json');
+    const stateFile = path.join(root, '.orca-team-orchestration', 'runs', 'story-0.1.0-001.json');
     const state = JSON.parse(fs.readFileSync(stateFile, 'utf8')) as {
       stages: Record<string, { round: number; status: string }>;
     };
@@ -418,10 +427,10 @@ describe('explain', () => {
     }
     fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`);
 
-    const pendingAccept = cli(root, ['explain', 'story-001']);
+    const pendingAccept = cli(root, ['explain', 'story-0.1.0-001']);
     assert.equal(pendingAccept.code, EXIT.ok, pendingAccept.stderr);
     assert.match(pendingAccept.stdout, /下一步：accept/);
-    assert.match(pendingAccept.stdout, /accept story-001/);
+    assert.match(pendingAccept.stdout, /accept story-0.1.0-001/);
   });
 });
 
@@ -509,12 +518,12 @@ describe('init --workspace', () => {
     const ws = tempWorkspace({ gitRoot: false });
     dirs.push(ws.root);
     assert.equal(cli(ws.root, ['init', '--workspace']).code, EXIT.ok);
-    write(ws.root, 'features/story-001.md', VALID_STORY);
+    write(ws.root, 'features/story-0.1.0-001.md', VALID_STORY);
 
     const listed = cli(ws.api, ['list', '--json']);
     assert.equal(listed.code, EXIT.ok, listed.stderr);
     const rows = JSON.parse(listed.stdout) as Array<{ id: string }>;
-    assert.equal(rows[0]?.id, 'story-001');
+    assert.equal(rows[0]?.id, 'story-0.1.0-001');
   });
 
   it('doctor 报告 workspace、关联仓库、ignore 与 worktree', () => {

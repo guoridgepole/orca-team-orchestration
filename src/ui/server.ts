@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { projectConfigPath, readProjectSettings } from '../core/config.js';
 import { CliError, PromptError } from '../core/errors.js';
-import { findExecutable } from '../core/orca.js';
+import { resolveOrcaBinary } from '../core/orca.js';
 import { findRepoRoot } from '../core/paths.js';
 import { planRolePrompts, readRolesSnapshot, saveRolePrompts } from '../core/prompts.js';
 
@@ -97,7 +97,7 @@ function sendText(
 function projectStatus(projectRoot: string): Record<string, unknown> {
   const snapshot = readProjectSettings(projectRoot);
   const settings = snapshot.settings;
-  const orca = findExecutable('orca-ide');
+  const orca = resolveOrcaBinary();
   const repos = settings.project.repos.map((repo) => ({ name: repo.name, path: repo.path }));
   return {
     ready: true,

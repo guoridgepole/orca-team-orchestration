@@ -47,7 +47,7 @@
 | Story | 一条需求，对应 `features/<story>.md` 文件 |
 | Stage | 当前流程中的阶段：`design`、`review`、`develop`、`test`、`accept` |
 | Role | 负责一个阶段的角色，例如设计者、审核者、开发者、测试者 |
-| Artifact | 阶段产物，例如 `docs/design/story-001-r1.md` |
+| Artifact | 阶段产物，例如 `docs/v0.1.0/design/story-0.1.0-001-r1.md` |
 | Guard | 工作区硬约束，例如 SQL 只追加、配置不可修改、数据库文件不可删除 |
 | Run | 一条 Story 的运行记录，保存在 `.orca-team-orchestration/runs/` |
 
@@ -71,19 +71,26 @@
 - 检查 Node、Git、配置、Agent 与 Orca 环境；
 - 输出适合脚本或 CI 使用的 JSON。
 
-`start` 需要真实的 Orca 运行时来派发 worker；未检测到 `orca-ide` 时会以退出码 `4` 结束并提示安装。派发之后的产物质量仍由阶段校验和 worker 决定，工具只做校验、推进、续跑与记录，不会替角色生成设计或代码。
+`start` 需要真实的 Orca 运行时来派发 worker；未检测到 Orca CLI 时会以退出码 `4` 结束并提示安装。派发之后的产物质量仍由阶段校验和 worker 决定，工具只做校验、推进、续跑与记录，不会替角色生成设计或代码。
 
 角色提示词目前通过 `render` 命令查看最终渲染结果；真实阶段派发接入后会复用同一个 `PromptRenderer`，无需再维护另一套提示词。
 
 ## 2. 安装
 
-`orca-team-orchestration init` 强制要求安装 Orca。先安装 Orca 桌面应用，并确认 CLI 已加入 `PATH`：
+`orca-team-orchestration init` 强制要求安装 Orca。先安装 Orca 桌面应用，并确认 CLI 已加入 `PATH`。Orca 的 CLI 命令名按平台不同：
+
+| 平台 | CLI 命令 | 常见位置 |
+| --- | --- | --- |
+| Linux | `orca-ide` | 安装 Orca 后即在 `PATH` 中 |
+| macOS | `orca` | `/Applications/Orca.app/Contents/Resources/bin/orca`（安装 Orca 后该目录通常已在 `PATH`） |
+| Windows | `orca` | 安装目录下的 `resources\bin\orca.exe` |
 
 ```bash
-orca-ide --version
+orca-ide --version   # Linux
+orca --version       # macOS / Windows
 ```
 
-如果提示找不到命令，请先安装 Orca。仅安装本工具或仅打开 Orca 界面都不足以通过该检查；命令必须能在当前终端中执行。
+如果提示找不到命令，请先安装 Orca。仅安装本工具或仅打开 Orca 界面都不足以通过该检查；命令必须能在当前终端中执行。也可以用环境变量 `ORCA_TEAM_ORCHESTRATION_ORCA` 直接指定 CLI 的完整路径（设为空字符串则禁用自动探测，主要供测试使用）。
 
 确认 Orca 可用后，在工具源码目录中执行：
 
@@ -98,7 +105,8 @@ npm link
 ```bash
 node --version
 git --version
-orca-ide --version
+orca-ide --version   # Linux
+orca --version       # macOS / Windows
 orca-team-orchestration --help
 ```
 
@@ -198,19 +206,20 @@ git commit -m "chore: initial project"
 
 ### 3.2 接入项目
 
-`init` 会先检查 Orca：
+`init` 会先检查 Orca CLI（Linux 为 `orca-ide`，macOS / Windows 为 `orca`）：
 
 ```bash
-orca-ide --version
+orca-ide --version   # Linux
+orca --version       # macOS / Windows
 ```
 
-未检测到 `orca-ide` 时，命令会提示安装 Orca，以退出码 `4` 结束，并且不会创建配置文件或项目目录。验证 Orca 可执行后，再执行：
+未检测到 Orca CLI 时，命令会提示安装 Orca，以退出码 `4` 结束，并且不会创建配置文件或项目目录。验证 Orca 可执行后，再执行：
 
 ```bash
 orca-team-orchestration init
 ```
 
-`init` 会显示检测到的 `orca-ide` 路径，自动探测常见的 `package.json` 脚本、源码目录和 SQL 文件，并创建：
+`init` 会显示检测到的 Orca CLI 路径，自动探测常见的 `package.json` 脚本、源码目录和 SQL 文件，并创建：
 
 ```text
 .orca-team-orchestration/
@@ -219,12 +228,9 @@ orca-team-orchestration init
   approvals/
 features/
 docs/
-  design/
-  review/
-  dev/
-  test/
-  test/evidence/
 ```
+
+`docs/` 下的阶段产物目录（`v<版本>/design/` 等）在运行时按需求版本自动创建，`init` 不预建。
 
 它还会把 `.orca-team-orchestration/runs/` 加入 `.gitignore`，并默认在 `.git/hooks/pre-commit` 安装守则检查（`--no-hook` 可跳过；已有非本工具的 hook 会备份为 `pre-commit.bak`）。Orca 已安装但当前未打开时仍可完成初始化；`init` 只检查可执行文件，不会启动 Orca。配置文件被重复初始化时会拒绝覆盖；只有确认需要重置时才使用 `--force`。
 
@@ -260,13 +266,13 @@ orca-team-orchestration ui
 ### 3.4 创建 Story
 
 ```bash
-orca-team-orchestration new story-001 --title "午餐抽签"
+orca-team-orchestration new story-0.1.0-001 --title "午餐抽签"
 ```
 
-然后编辑 `features/story-001.md`，填写功能清单和验收标准。可使用下面的模板：
+然后编辑 `features/story-0.1.0-001.md`，填写功能清单和验收标准。可使用下面的模板：
 
 ```markdown
-# story-001 午餐抽签
+# story-0.1.0-001 午餐抽签
 
 - 背景: 中午不知道吃什么，点一下随机抽取。
 - 依赖: 无
@@ -281,22 +287,22 @@ orca-team-orchestration new story-001 --title "午餐抽签"
 
 ## 验收标准
 
-- [ ] story-001-1 打开页面能看到“抽签”按钮
-- [ ] story-001-2 点击后随机显示一个候选菜名
-- [ ] story-001-3 点击“再抽一次”后可以重新抽取
-- [ ] story-001-4 320px 宽度下页面没有横向滚动
+- [ ] story-0.1.0-001-1 打开页面能看到“抽签”按钮
+- [ ] story-0.1.0-001-2 点击后随机显示一个候选菜名
+- [ ] story-0.1.0-001-3 点击“再抽一次”后可以重新抽取
+- [ ] story-0.1.0-001-4 320px 宽度下页面没有横向滚动
 ```
 
 创建文件时，默认会尝试生成一次本地 Git 提交。如果暂时不想提交，可使用：
 
 ```bash
-orca-team-orchestration new story-002 --title "待办事项" --no-commit
+orca-team-orchestration new story-0.2.0-001 --title "待办事项" --no-commit
 ```
 
 ### 3.5 校验并查看 Story
 
 ```bash
-orca-team-orchestration lint story-001
+orca-team-orchestration lint story-0.1.0-001
 orca-team-orchestration list
 ```
 
@@ -307,49 +313,49 @@ orca-team-orchestration list
 先预演，不写入运行状态：
 
 ```bash
-orca-team-orchestration start story-001 --dry-run --orchestrator orca
+orca-team-orchestration start story-0.1.0-001 --dry-run --orchestrator orca
 ```
 
-预演不会创建 `.orca-team-orchestration/runs/story-001.json`，但仍会写入需求快照 `.orca-team-orchestration/runs/story-001/spec.md`。
+预演不会创建 `.orca-team-orchestration/runs/story-0.1.0-001.json`，但仍会写入需求快照 `.orca-team-orchestration/runs/story-0.1.0-001/spec.md`。
 
 确认无误后正式开始：
 
 ```bash
-orca-team-orchestration start story-001 --orchestrator orca
+orca-team-orchestration start story-0.1.0-001 --orchestrator orca
 ```
 
 正式执行会完成以下操作：
 
 1. 检查 Story 格式与依赖；
-2. 把需求复制到 `.orca-team-orchestration/runs/story-001/spec.md`；
+2. 把需求复制到 `.orca-team-orchestration/runs/story-0.1.0-001/spec.md`；
 3. 记录需求内容的 SHA-256；
-4. 在 `.orca-team-orchestration/runs/story-001.json` 中创建运行状态；
+4. 在 `.orca-team-orchestration/runs/story-0.1.0-001.json` 中创建运行状态；
 5. 探测 Orca、建立编排 Run，并按 `design → review → develop → test` 依次派发 worker；
 6. 每个角色完成后校验产物、写范围、守则与角色命令检查：通过则写检查点提交并进入下一阶段，失败则回到本回路起点进入下一轮，超过轮次上限则创建 gate 并以退出码 `7` 结束；
 7. 全部阶段通过后停在 `accept`，等待需求方执行 `accept`。
 
-若中途中断（超时、Ctrl-C、崩溃），未完成派发的句柄会保存在 `runs/story-001.json` 的 `pending` 中，用 `resume` 继续等待，而不会重复派发：
+若中途中断（超时、Ctrl-C、崩溃），未完成派发的句柄会保存在 `runs/story-0.1.0-001.json` 的 `pending` 中，用 `resume` 继续等待，而不会重复派发：
 
 ```bash
-orca-team-orchestration resume story-001
+orca-team-orchestration resume story-0.1.0-001
 ```
 
 需求文件在快照后被修改时，`resume` 会拒绝执行；确认后加 `--refresh-spec` 重建快照（若验收范围变化会退回 design 重新评审）：
 
 ```bash
-orca-team-orchestration resume story-001 --refresh-spec
+orca-team-orchestration resume story-0.1.0-001 --refresh-spec
 ```
 
 全部阶段通过后记录验收：
 
 ```bash
-orca-team-orchestration accept story-001
+orca-team-orchestration accept story-0.1.0-001
 ```
 
 ### 3.7 查看状态
 
 ```bash
-orca-team-orchestration status story-001
+orca-team-orchestration status story-0.1.0-001
 ```
 
 输出会显示状态、下一阶段、编排器、运行 ID、快照路径和各阶段状态。
@@ -382,10 +388,10 @@ orca-team-orchestration init --workspace
 之后所有命令都在 workspace 根执行（在任一子仓内执行时，工具会自动向上解析到 workspace 根）：
 
 ```bash
-orca-team-orchestration new story-001 --title "下单页联动改造"
-# ... 填写 features/story-001.md ...
-orca-team-orchestration lint story-001
-orca-team-orchestration start story-001 --dry-run
+orca-team-orchestration new story-0.1.0-001 --title "下单页联动改造"
+# ... 填写 features/story-0.1.0-001.md ...
+orca-team-orchestration lint story-0.1.0-001
+orca-team-orchestration start story-0.1.0-001 --dry-run
 ```
 
 一个 Orca worker 运行在 workspace 根，可以同时编辑 `api/` 与 `web/`。所有配置路径、写范围、产物、守则路径仍然是 **workspace 相对路径**，例如：
@@ -437,16 +443,16 @@ guards:
 Story 文件必须放在 `features/` 下，文件名去掉 `.md` 后就是 Story ID：
 
 ```text
-features/story-001.md  →  story-001
+features/story-0.1.0-001.md  →  story-0.1.0-001
 ```
 
 标题必须是文件中的第一个非空行：
 
 ```markdown
-# story-001 午餐抽签
+# story-0.1.0-001 午餐抽签
 ```
 
-Story ID 只能由字母、数字、点、下划线和连字符组成，并且必须以字母或数字开头。标题中的 ID 必须与文件名一致。
+Story ID 必须是 `story-<版本>-<序号>` 格式：前缀固定为 `story`，版本是三段数字（如 `0.1.0`），序号是 1 位以上数字（如 `001`、`02`）。示例：`story-0.1.0-001`、`story-1.1.1-02`。标题中的 ID 必须与文件名一致。docs 产物目录中的版本号（`docs/v0.1.0/...`）即从 Story ID 的版本段派生。
 
 ### 4.2 可选元数据
 
@@ -454,7 +460,7 @@ Story ID 只能由字母、数字、点、下划线和连字符组成，并且�
 
 ```markdown
 - 背景: 这项需求的起因和用户问题
-- 依赖: story-000
+- 依赖: story-0.1.0-000
 - 明确不做: 本次不包含的范围
 - 测试数据: 测试所需的固定数据
 - 详见: docs/requirements/detail.md
@@ -482,8 +488,8 @@ Story ID 只能由字母、数字、点、下划线和连字符组成，并且�
 ```markdown
 ## 验收标准
 
-- [ ] story-001-1 打开页面后能看到待办列表
-- [ ] story-001-2 新增待办后，无需刷新即可看到新内容
+- [ ] story-0.1.0-001-1 打开页面后能看到待办列表
+- [ ] story-0.1.0-001-2 新增待办后，无需刷新即可看到新内容
 ```
 
 也可以使用表格：
@@ -493,8 +499,8 @@ Story ID 只能由字母、数字、点、下划线和连字符组成，并且�
 
 | 验收 ID | 描述 |
 |---|---|
-| story-001-1 | 打开页面后能看到待办列表 |
-| story-001-2 | 新增待办后立即显示 |
+| story-0.1.0-001-1 | 打开页面后能看到待办列表 |
+| story-0.1.0-001-2 | 新增待办后立即显示 |
 ```
 
 验收 ID 必须以 `<story>-` 开头，并在 Story 内唯一。Story 文件中的验收标准是最终验收依据，不应只写在聊天记录或设计文档中。
@@ -504,7 +510,7 @@ Story ID 只能由字母、数字、点、下划线和连字符组成，并且�
 检查单条 Story：
 
 ```bash
-orca-team-orchestration lint story-001
+orca-team-orchestration lint story-0.1.0-001
 ```
 
 检查 `features/` 下的全部 Story：
@@ -516,7 +522,7 @@ orca-team-orchestration lint
 在自动化脚本中获取 JSON：
 
 ```bash
-orca-team-orchestration lint story-001 --json
+orca-team-orchestration lint story-0.1.0-001 --json
 ```
 
 ## 5. 日常操作流程
@@ -572,7 +578,7 @@ orca-team-orchestration status
 查看单条 Story：
 
 ```bash
-orca-team-orchestration status story-001
+orca-team-orchestration status story-0.1.0-001
 ```
 
 如果需求文件在建立快照后被修改，状态输出会显示“需求文件已变更”。确认变更内容后，用 `resume <story> --refresh-spec` 重建快照；若功能或验收标准发生变化，运行会退回 design 阶段重新评审。存在未完成派发（`pending`）时不能刷新快照，需先 `resume` 等待该派发结束。
@@ -588,10 +594,10 @@ orca-team-orchestration check <design|review|develop|test> <story> [--round N]
 例如：
 
 ```bash
-orca-team-orchestration check design story-001 --round 1
-orca-team-orchestration check review story-001 --round 1
-orca-team-orchestration check develop story-001 --round 1
-orca-team-orchestration check test story-001 --round 1
+orca-team-orchestration check design story-0.1.0-001 --round 1
+orca-team-orchestration check review story-0.1.0-001 --round 1
+orca-team-orchestration check develop story-0.1.0-001 --round 1
+orca-team-orchestration check test story-0.1.0-001 --round 1
 ```
 
 一次检查包含三部分：
@@ -605,25 +611,25 @@ GUARD    SQL、配置、数据库文件是否违反硬约束
 全部通过时输出：
 
 ```text
-STAGE-CHECK: PASS（design story-001 r1）
+STAGE-CHECK: PASS（design story-0.1.0-001 r1）
 ```
 
 检查失败时会逐项显示原因。使用 `--json` 可获得结构化结果：
 
 ```bash
-orca-team-orchestration check design story-001 --round 1 --json
+orca-team-orchestration check design story-0.1.0-001 --round 1 --json
 ```
 
 ### 6.2 默认产物要求
 
-默认配置下各阶段产物如下：
+默认配置下各阶段产物如下（`<版本>` 从 Story ID 的版本段派生，如 story-0.1.0-001 的产物写入 `docs/v0.1.0/`；角色 `artifact.path` 模板中的 `{{version}}` 变量即代表该版本）：
 
 | 阶段 | 默认产物 | 关键要求 |
 |---|---|---|
-| design | `docs/design/<story>-r<round>.md` | 包含“目标”“验收映射”“数据库变更”“失败路径”“回滚”章节 |
-| review | `docs/review/<story>-r<round>.md` | 首个非空行为 `PASS` 或 `REJECT`；包含“问题清单”“通过条件” |
-| develop | `docs/dev/<story>-r<round>.md` | 包含“变更”“自测”“SQL” |
-| test | `docs/test/<story>-r<round>.md` | 首个非空行为 `PASS` 或 `FAIL`；包含“用例结果”“证据” |
+| design | `docs/v<版本>/design/<story>-r<round>.md` | 包含“目标”“验收映射”“数据库变更”“失败路径”“回滚”章节 |
+| review | `docs/v<版本>/review/<story>-r<round>.md` | 首个非空行为 `PASS` 或 `REJECT`；包含“问题清单”“通过条件” |
+| develop | `docs/v<版本>/dev/<story>-r<round>.md` | 包含“变更”“自测”“SQL” |
+| test | `docs/v<版本>/test/<story>-r<round>.md` | 首个非空行为 `PASS` 或 `FAIL`；包含“用例结果”“证据” |
 
 设计产物示例：
 
@@ -636,9 +642,9 @@ orca-team-orchestration check design story-001 --round 1 --json
 
 ## 验收映射
 
-- F1 → story-001-1、story-001-2
-- F2 → story-001-3
-- F3 → story-001-4
+- F1 → story-0.1.0-001-1、story-0.1.0-001-2
+- F2 → story-0.1.0-001-3
+- F3 → story-0.1.0-001-4
 
 ## 数据库变更
 
@@ -688,7 +694,7 @@ SCOPE FAIL  design 阶段越界改动：src/app.ts
 使用 `--round` 指定要检查的轮次。没有显式指定且存在运行记录时，优先使用运行状态中的轮次；否则使用已有产物中的最大轮次。
 
 ```bash
-orca-team-orchestration check review story-001 --round 2
+orca-team-orchestration check review story-0.1.0-001 --round 2
 ```
 
 ## 7. 守则校验
@@ -804,13 +810,13 @@ orca-team-orchestration guard approvals
 ## 7.4 explain：下一步该做什么
 
 ```bash
-orca-team-orchestration explain story-001
+orca-team-orchestration explain story-0.1.0-001
 ```
 
 输出当前状态、下一步阶段、原因（未完成派发、gate、需求漂移、缺少的产物）和建议命令，帮助协作者在不读源码的情况下接手。机器可读：
 
 ```bash
-orca-team-orchestration explain story-001 --json
+orca-team-orchestration explain story-0.1.0-001 --json
 ```
 
 ## 8. 配置说明
@@ -869,7 +875,7 @@ project:
     tests:
       - test/
     db: db/update.sql
-    evidence: docs/test/evidence
+    evidence: docs/v{{version}}/test/evidence
 
 runtime:
   orchestrator: orca
@@ -967,9 +973,9 @@ templates/<locale>/
 查看某个角色最终会收到的完整提示词：
 
 ```bash
-orca-team-orchestration render designer story-001 --round 2
-orca-team-orchestration render reviewer story-001 --previous docs/review/story-001-r1.md
-orca-team-orchestration render tester story-001 --json
+orca-team-orchestration render designer story-0.1.0-001 --round 2
+orca-team-orchestration render reviewer story-0.1.0-001 --previous docs/v0.1.0/review/story-0.1.0-001-r1.md
+orca-team-orchestration render tester story-0.1.0-001 --json
 ```
 
 `render` 不要求项目配置里已经填好命令，也不要求 Orca 可用。需求优先读取 `.orca-team-orchestration/runs/<story>/spec.md` 快照；快照不存在时读取 `features/<story>.md` 并输出 warning。`--stage` 可指定角色所属阶段，`--previous` 附加上一轮报告，`--json` 输出结构化结果。
@@ -1043,6 +1049,15 @@ export ORCA_TEAM_ORCHESTRATION_REPO=/path/to/project
 orca-team-orchestration list
 ```
 
+Orca CLI 的自动探测顺序为：`PATH` 中的 `orca-ide` → `PATH` 中的 `orca`（校验 `--version` 输出，避免误认同名命令）→ 平台默认安装位置（macOS 的 `/Applications/Orca.app/Contents/Resources/bin/orca`、Windows 的 `%LOCALAPPDATA%\Programs\Orca\resources\bin\orca.exe` 等）。也可以用环境变量直接指定：
+
+```bash
+export ORCA_TEAM_ORCHESTRATION_ORCA=/path/to/orca
+orca-team-orchestration init
+```
+
+设为空字符串（`ORCA_TEAM_ORCHESTRATION_ORCA=''`）会禁用自动探测，主要用于测试隔离。
+
 ## 11. 退出码与结果判断
 
 | 退出码 | 含义 | 建议操作 |
@@ -1051,7 +1066,7 @@ orca-team-orchestration list
 | `1` | 校验失败 | 查看 `ARTIFACT`、`SCOPE` 或命令检查输出并修复 |
 | `2` | 用法错误 | 检查命令、参数和位置是否正确 |
 | `3` | 配置或 Story 文件非法 | 根据提示修正 YAML 或 Markdown |
-| `4` | 编排器不可用或等待 worker 超时 | 确认 `orca-ide` 可执行、Run 可用；超时用 `resume` 继续等待 |
+| `4` | 编排器不可用或等待 worker 超时 | 确认 Orca CLI（Linux 为 `orca-ide`，macOS / Windows 为 `orca`）可执行、Run 可用；超时用 `resume` 继续等待 |
 | `5` | Agent 不可用 | 检查 Agent 安装、认证和命令；`start`/`resume` 派发前会预检 flow 中各角色绑定的 agent 命令（claude/codex/zcode/opencode/qoder/codebuddy，其中 qoder 检查 `qodercli`），缺失时直接以 `5` 结束并提示安装或改绑 |
 | `6` | 守则违规 | 根据 `guard id` 和“修法”处理 |
 | `7` | gate 待处理（轮次超限或 worker 提出需决策的问题） | 处理 `.orca-team-orchestration/runs/<story>.json` 的 gate 后 `resume` |
@@ -1073,17 +1088,18 @@ orca-team-orchestration list
       designer.md.bak           # 页面保存前的旧覆盖，不建议提交
     approvals/                  # 后续审批使用
     runs/                       # 运行态，不提交
-      story-001.json
-      story-001/
+      story-0.1.0-001.json
+      story-0.1.0-001/
         spec.md
   features/
-    story-001.md                # 需求源文件，建议提交
+    story-0.1.0-001.md                # 需求源文件，建议提交
   docs/
-    design/
-    review/
-    dev/
-    test/
-      evidence/
+    v0.1.0/                    # 版本目录从 Story ID 的版本段派生，运行时自动创建
+      design/
+      review/
+      dev/
+      test/
+        evidence/
 ```
 
 重要原则：
@@ -1187,7 +1203,7 @@ git rm -r --cached api
 roles:
   developer:
     writes:
-      - docs/dev/
+      - docs/v{{version}}/dev/
       - api/package.json
       - api/package-lock.json
 ```
@@ -1207,7 +1223,7 @@ orca-team-orchestration config --start "npm run dev" --test "npm test"
 先完成依赖 Story。如果业务上确认可以并行开始：
 
 ```bash
-orca-team-orchestration start story-002 --ignore-deps
+orca-team-orchestration start story-0.2.0-001 --ignore-deps
 ```
 
 ### `start` 返回退出码 4
@@ -1216,10 +1232,10 @@ orca-team-orchestration start story-002 --ignore-deps
 
 ```bash
 orca-team-orchestration doctor
-orca-team-orchestration status story-001
+orca-team-orchestration status story-0.1.0-001
 ```
 
-如果 `doctor` 提示找不到 `orca-ide`，请安装 Orca 后重试。若是派发后等待超时，未完成派发的句柄已保存在 `runs/story-001.json` 的 `pending` 中，用 `resume` 继续等待即可，不会重复派发。阶段产物也可以按配置由现有流程生成，再用 `check` 校验。
+如果 `doctor` 提示找不到 Orca CLI（Linux 为 `orca-ide`，macOS / Windows 为 `orca`），请安装 Orca 后重试。若是派发后等待超时，未完成派发的句柄已保存在 `runs/story-0.1.0-001.json` 的 `pending` 中，用 `resume` 继续等待即可，不会重复派发。阶段产物也可以按配置由现有流程生成，再用 `check` 校验。
 
 ### `lint` 显示行号错误
 
@@ -1227,10 +1243,10 @@ orca-team-orchestration status story-001
 
 ### `check` 产物缺失
 
-确认 Story ID、阶段轮次和配置中的产物路径一致。默认格式为：
+确认 Story ID、阶段轮次和配置中的产物路径一致。默认格式为（`v<版本>` 来自 Story ID 的版本段，如 story-0.1.0-001 对应 `docs/v0.1.0/`）：
 
 ```text
-docs/<stage>/<story>-r<round>.md
+docs/v<版本>/<stage>/<story>-r<round>.md
 ```
 
 ### `check` 报告越界改动
@@ -1243,14 +1259,14 @@ docs/<stage>/<story>-r<round>.md
 
 ### Orca 未安装
 
-`init` 和 `auto` 编排模式都要求 Orca 已安装。未检测到 `orca-ide` 时会以退出码 `4` 结束，并提示：
+`init` 和 `auto` 编排模式都要求 Orca 已安装。未检测到 Orca CLI 时会以退出码 `4` 结束，并提示：
 
 1. 安装 Orca 桌面应用；
-2. 确保 `orca-ide` 已加入 `PATH`；
-3. 运行 `orca-ide --version` 验证；
+2. 确保 Orca CLI 已加入 `PATH`（Linux 为 `orca-ide`，macOS / Windows 为 `orca`）；
+3. 运行 `orca-ide --version`（Linux）或 `orca --version`（macOS / Windows）验证；
 4. 重新执行原命令。
 
-检查失败时 `init` 不会写入任何项目文件，避免留下半初始化状态。Orca 已安装但未启动时，`init` 仍会成功；自动启动和运行态检查由后续编排器能力负责。
+也可以设置环境变量 `ORCA_TEAM_ORCHESTRATION_ORCA` 直接指定 CLI 的完整路径。检查失败时 `init` 不会写入任何项目文件，避免留下半初始化状态。Orca 已安装但未启动时，`init` 仍会成功；自动启动和运行态检查由后续编排器能力负责。
 
 ### `start` 返回退出码 5（agent 命令缺失）
 
@@ -1354,6 +1370,6 @@ npm run typecheck
 npm test
 ```
 
-CI 配置位于 `.github/workflows/ci.yml`，覆盖 Linux / macOS / Windows 与 Node.js 20 / 22。真实 Orca 端到端探测只在设置了 `ORCA_E2E=1` 且本机存在 `orca-ide` 时执行，其余环境会自动跳过。
+CI 配置位于 `.github/workflows/ci.yml`，覆盖 Linux / macOS / Windows 与 Node.js 20 / 22。真实 Orca 端到端探测只在设置了 `ORCA_E2E=1` 且本机检测到 Orca CLI（Linux 为 `orca-ide`，macOS / Windows 为 `orca`）时执行，其余环境会自动跳过。
 
 提交信息建议使用 Conventional Commits（如 `feat: ...`、`fix: ...`、`docs: ...`），并保持单个提交只做一类改动。

@@ -13,7 +13,7 @@ test('store 支持新增、完成与列表', () => {
   assert.equal(list[0].done, true);
 });
 
-test('HTTP 接口覆盖 story-002 验收', async () => {
+test('HTTP 接口覆盖 story-0.2.0-001 验收', async () => {
   const server = createTodoServer();
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
