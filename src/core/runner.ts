@@ -160,6 +160,19 @@ async function runStage(options: RunnerOptions, stage: string): Promise<StageOut
       pending = undefined;
     }
 
+    let resumeTask: { taskId: string } | undefined;
+    if (pending) {
+      const inspection = await orchestrator.inspect(pending);
+      if (inspection.state === 'lost') {
+        resumeTask = pending.taskId ? inspection.resume ?? { taskId: pending.taskId } : undefined;
+        log(`warning: 未完成的派发已结束（${inspection.reason ?? 'worker 已退出'}），重新派发`);
+        state.pending = undefined;
+        pending = undefined;
+      } else {
+        log(`继续等待未完成的派发：${stage} ${roleName} r${round}`);
+      }
+    }
+
     if (!pending) {
       const previousArtifact = previousArtifactFor(config, state, stage, round);
       const rendered = renderRolePrompt(root, config, roleName, {
@@ -182,6 +195,7 @@ async function runStage(options: RunnerOptions, stage: string): Promise<StageOut
         prompt: rendered.prompt,
         worktree: config.runtime.worktree ?? 'path:.',
         timeoutMs,
+        ...(resumeTask ? { resume: resumeTask } : {}),
       });
       state.pending = {
         ...handle,
@@ -193,8 +207,6 @@ async function runStage(options: RunnerOptions, stage: string): Promise<StageOut
       writeState(root, state);
       pending = state.pending;
       log(`  已启动：${handle.taskId ?? '(task)'} / ${handle.dispatchId ?? '(dispatch)'}`);
-    } else {
-      log(`继续等待未完成的派发：${stage} ${roleName} r${round}`);
     }
 
     const scopeIgnore = new Set(pending.baseline ?? []);

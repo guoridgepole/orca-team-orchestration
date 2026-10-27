@@ -13,6 +13,7 @@ import type {
   DispatchResult,
   GateRequest,
   Orchestrator,
+  PendingInspection,
   WaitOptions,
 } from '../src/core/orchestrator.js';
 import { runStory } from '../src/core/runner.js';
@@ -58,6 +59,7 @@ class StubOrchestrator implements Orchestrator {
   released: DispatchHandle[] = [];
   createRunCalls = 0;
   useRunCalls = 0;
+  pendingStatus: PendingInspection = { state: 'running' };
   constructor(private readonly worker: Worker) {}
 
   async probe(): Promise<void> {}
@@ -67,6 +69,9 @@ class StubOrchestrator implements Orchestrator {
   }
   async useRun(): Promise<void> {
     this.useRunCalls += 1;
+  }
+  async inspect(): Promise<PendingInspection> {
+    return this.pendingStatus;
   }
   async dispatch(plan: DispatchPlan): Promise<DispatchHandle> {
     this.dispatches.push(plan);
@@ -136,8 +141,15 @@ function setupRepo(config: Config): { root: string; state: RunState } {
   return { root, state };
 }
 
-function run(root: string, config: Config, state: RunState, worker: Worker) {
+function run(
+  root: string,
+  config: Config,
+  state: RunState,
+  worker: Worker,
+  pendingStatus?: PendingInspection,
+) {
   const orchestrator = new StubOrchestrator(worker);
+  if (pendingStatus) orchestrator.pendingStatus = pendingStatus;
   const logs: string[] = [];
   return runStory({
     root,
@@ -349,6 +361,42 @@ describe('runner 阶段闭环', () => {
       assert.equal(orchestrator.createRunCalls, 0);
       assert.ok(!orchestrator.dispatches.some((p) => p.stage === 'design'), 'design 不应重新派发');
       assert.ok(orchestrator.dispatches.some((p) => p.stage === 'review'));
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  it('resume 时未完成的派发已退出则重开同一任务', async () => {
+    const config = builtinDefaults('demo');
+    const { root, state } = setupRepo(config);
+    state.orca = { runId: 'run_stub' };
+    state.stages.design = { round: 1, status: 'running' };
+    state.pending = {
+      runId: 'run_stub',
+      taskId: taskId('design', 'designer', 1),
+      dispatchId: 'ctx_design_designer_r1',
+      stage: 'design',
+      role: 'designer',
+      round: 1,
+      baseline: [],
+    };
+    writeState(root, state);
+    try {
+      const { result, orchestrator, logs } = await run(
+        root,
+        config,
+        state,
+        (d) => {
+          const rel = writeArtifact(root, config, d);
+          return { outcome: 'succeeded', summary: 'ok', reportPath: rel };
+        },
+        { state: 'lost', reason: 'failed/failed/process_exited（task ready）', resume: { taskId: taskId('design', 'designer', 1) } },
+      );
+      assert.equal(result.exitCode, EXIT.ok);
+      const design = orchestrator.dispatches.find((p) => p.stage === 'design');
+      assert.ok(design, 'design 应重新派发');
+      assert.deepEqual(design.resume, { taskId: taskId('design', 'designer', 1) });
+      assert.match(logs.join('\n'), /未完成的派发已结束.*重新派发/);
     } finally {
       cleanup(root);
     }

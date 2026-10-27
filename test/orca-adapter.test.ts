@@ -45,6 +45,27 @@ if (cmd === 'check') {
   return out({ ok: true, result: { messages: [doneMsg], delivery_id: 'del_1' } });
 }
 if (cmd === 'reply') return out({ ok: true });
+if (cmd === 'worker-list') {
+  const exited = scenario() === 'lost' || scenario() === 'taskdone';
+  return out({
+    ok: true,
+    result: {
+      workers: [{
+        dispatchId: 'ctx_fake',
+        taskId: 'task_fake',
+        workerState: exited ? 'failed' : 'running',
+        dispatchStatus: exited ? 'failed' : 'active',
+        projection: {
+          stage: { worker: exited ? 'failed' : 'running', dispatch: exited ? 'failed' : 'active', detail: exited ? 'process_exited' : 'running' },
+          liveness: { verdict: exited ? 'exited' : 'live', source: 'execution_host' },
+        },
+      }],
+    },
+  });
+}
+if (cmd === 'task-list') {
+  return out({ ok: true, result: { tasks: [{ id: 'task_fake', status: scenario() === 'taskdone' ? 'completed' : 'ready' }] } });
+}
 if (cmd === 'task-create') return out({ ok: true, result: { task: { id: 'task_gate' } } });
 if (cmd === 'gate-create') return out({ ok: true, result: { gate: { id: 'gate_fake' } } });
 if (cmd === 'worker-release') return out({ ok: true });
@@ -137,6 +158,32 @@ describe('Orca adapter', { skip }, () => {
     const index = start.indexOf('--timeout-ms');
     assert.notEqual(index, -1, JSON.stringify(start));
     assert.equal(start[index + 1], String(60 * 60_000));
+  });
+
+  it('恢复派发用 --task 重开任务并复用原 spec', async () => {
+    const a = adapter();
+    await a.dispatch(plan({ resume: { taskId: 'task_fake' } }));
+    const start = loggedArgs()[0]!;
+    assert.ok(start.includes('--task') && start.includes('task_fake'));
+    assert.ok(!start.includes('--spec'));
+    assert.ok(!start.includes('--retry-of'));
+  });
+
+  it('inspect 区分存活、已结算与丢失的派发', async () => {
+    const a = adapter();
+    const handle = { runId: 'run_fake', taskId: 'task_fake', dispatchId: 'ctx_fake' };
+
+    fs.writeFileSync(path.join(root, '.orca-fake-scenario'), 'running');
+    assert.equal((await a.inspect(handle)).state, 'running');
+
+    fs.writeFileSync(path.join(root, '.orca-fake-scenario'), 'taskdone');
+    assert.equal((await a.inspect(handle)).state, 'completed');
+
+    fs.writeFileSync(path.join(root, '.orca-fake-scenario'), 'lost');
+    const inspection = await a.inspect(handle);
+    assert.equal(inspection.state, 'lost');
+    assert.deepEqual(inspection.resume, { taskId: 'task_fake' });
+    assert.ok(loggedArgs().some((line) => line[1] === 'task-list'));
   });
 
   it('dispatch 拒绝不受支持的 agent kind', async () => {

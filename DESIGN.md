@@ -89,7 +89,7 @@ CLI
 
 `StageRunner` 是唯一知道流程的地方。adapter 只负责“把一份 prompt 交给一个 agent，并回报结果”，不知道角色语义。
 
-实现状态（0.0.0）：`PromptRenderer` 与 `render` 命令已落地，默认模板位于 `templates/<locale>/`，项目覆盖文件为 `.orca-team-orchestration/roles/<role>.md`。`StageRunner`（`src/core/runner.ts`）与 Orca adapter（`src/adapters/orca/adapter.ts`）已接入核心闭环：`start` 探测 Orca、建立 Run、按 flow 派发 worker、等待 `worker_done`/问题、校验产物/范围/守则/命令检查、更新阶段轮次与失败回路、超限或需决策时创建 gate，并写本地检查点提交；`resume` 续跑未完成派发或刷新快照，`accept` 记录验收。adapter 通过 `Orchestrator` 接口注入，runner 用 Stub 测试、真实链路用 `OrcaAdapter`。5173 页面可编辑角色提示词、角色 Agent 绑定与 agents 池（增改删定义）以及轮次上限；项目命令和路径由 `config` 或 YAML 维护；5.7 描述的是后续完整初始化页面的目标形态。真实 Orca worker 端到端联调与浏览器驱动落地仍在建设中。
+实现状态（0.0.0）：`PromptRenderer` 与 `render` 命令已落地，默认模板位于 `templates/<locale>/`，项目覆盖文件为 `.orca-team-orchestration/roles/<role>.md`。`StageRunner`（`src/core/runner.ts`）与 Orca adapter（`src/adapters/orca/adapter.ts`）已接入核心闭环：`start` 探测 Orca、建立 Run、按 flow 派发 worker、等待 `worker_done`/问题、校验产物/范围/守则/命令检查、更新阶段轮次与失败回路、超限或需决策时创建 gate，并写本地检查点提交；`resume` 续跑未完成派发（先核实 Orca liveness：存活则等待，已退出且任务未结算则用 `--task` 重开同一任务）或刷新快照，`accept` 记录验收。adapter 通过 `Orchestrator` 接口注入，runner 用 Stub 测试、真实链路用 `OrcaAdapter`。5173 页面可编辑角色提示词、角色 Agent 绑定与 agents 池（增改删定义）以及轮次上限；项目命令和路径由 `config` 或 YAML 维护；5.7 描述的是后续完整初始化页面的目标形态。真实 Orca worker 端到端联调与浏览器驱动落地仍在建设中。
 
 ## 5. 配置
 
@@ -618,7 +618,7 @@ interface Orchestrator {
 | `start [<story>] [--orchestrator] [--agent]` | 不给 ID 时交互选择；切快照、建 run、跑该 story 的全部功能直到待验收（已实现：派发 Orca worker 自动推进） |
 | `new <story> [--title "…"]` | 创建 `features/<story>.md` 骨架并提交（手写文件同样合法） |
 | `lint [<story>]` | 只校验需求文件格式：文件名与 ID 一致、功能非空、验收编号归属、依赖存在 |
-| `resume <story> [--refresh-spec]` | 从状态与产物继续；需求文件变更时需显式刷新快照（已实现：续跑 pending/gate、刷新快照） |
+| `resume <story> [--refresh-spec]` | 从状态与产物继续；需求文件变更时需显式刷新快照（已实现：续跑 pending/gate、核实派发存活并在已退出时重新派发、刷新快照） |
 | `accept <story>` | 全部阶段通过后记录需求方验收并写验收文档（已实现） |
 | `check <stage> <story> [--round N]` | 阶段总校验（产物 + 范围 + 守则 + 角色命令检查） |
 | `guard run [--id] [--staged] [--staged-repo name\|all]` | 单独跑守则；多仓下选择暂存区检查范围 |

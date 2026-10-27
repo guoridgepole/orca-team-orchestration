@@ -334,7 +334,7 @@ orca-team-orchestration start story-0.1.0-001 --orchestrator orca
 6. 每个角色完成后校验产物、写范围、守则与角色命令检查：通过则写检查点提交并进入下一阶段，失败则回到本回路起点进入下一轮，超过轮次上限则创建 gate 并以退出码 `7` 结束；
 7. 全部阶段通过后停在 `accept`，等待需求方执行 `accept`。
 
-若中途中断（超时、Ctrl-C、崩溃），未完成派发的句柄会保存在 `runs/story-0.1.0-001.json` 的 `pending` 中，用 `resume` 继续等待，而不会重复派发：
+若中途中断（超时、Ctrl-C、崩溃），未完成派发的句柄会保存在 `runs/story-0.1.0-001.json` 的 `pending` 中。`resume` 会先向 Orca 核实该派发是否仍存活：仍存活则继续等待，不会重复派发；若 worker 进程已退出且任务未结算（例如手动停止任务或关闭窗口），则用 `--task` 重新打开同一任务，按原 spec 重新派发同一阶段与轮次：
 
 ```bash
 orca-team-orchestration resume story-0.1.0-001
@@ -1237,7 +1237,7 @@ orca-team-orchestration doctor
 orca-team-orchestration status story-0.1.0-001
 ```
 
-如果 `doctor` 提示找不到 Orca CLI（Linux 为 `orca-ide`，macOS / Windows 为 `orca`），请安装 Orca 后重试。若是派发后等待超时，未完成派发的句柄已保存在 `runs/story-0.1.0-001.json` 的 `pending` 中，用 `resume` 继续等待即可，不会重复派发。阶段产物也可以按配置由现有流程生成，再用 `check` 校验。
+如果 `doctor` 提示找不到 Orca CLI（Linux 为 `orca-ide`，macOS / Windows 为 `orca`），请安装 Orca 后重试。若是派发后等待超时，未完成派发的句柄已保存在 `runs/story-0.1.0-001.json` 的 `pending` 中；用 `resume` 继续等待，若 worker 已被停止或退出，`resume` 会用 `--task` 重新打开同一任务并重新派发。阶段产物也可以按配置由现有流程生成，再用 `check` 校验。
 
 ### `lint` 显示行号错误
 

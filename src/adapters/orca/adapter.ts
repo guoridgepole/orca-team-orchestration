@@ -10,6 +10,7 @@ import type {
   DispatchResult,
   GateRequest,
   Orchestrator,
+  PendingInspection,
   WaitOptions,
 } from '../../core/orchestrator.js';
 
@@ -144,6 +145,23 @@ function extractAckId(json: unknown): string | undefined {
   return findString(result, ['delivery_id', 'deliveryId', 'batch_id', 'batchId', 'delivery']);
 }
 
+function extractWorkers(json: unknown): JsonObject[] {
+  const result = asObject(asObject(json)?.result) ?? asObject(json);
+  const found = deepFind(result ?? json, 'workers');
+  return Array.isArray(found) ? (found.filter((item) => asObject(item) !== null) as JsonObject[]) : [];
+}
+
+function extractTaskStatus(json: unknown, taskId: string): string | undefined {
+  const result = asObject(asObject(json)?.result) ?? asObject(json);
+  const found = deepFind(result ?? json, 'tasks');
+  if (!Array.isArray(found)) return undefined;
+  for (const item of found) {
+    const task = asObject(item);
+    if (task?.id === taskId && typeof task.status === 'string') return task.status;
+  }
+  return undefined;
+}
+
 function extractGateId(json: unknown): string | undefined {
   const result = asObject(asObject(json)?.result) ?? asObject(json);
   const gate = findObject(result, 'gate');
@@ -235,11 +253,13 @@ export class OrcaAdapter implements Orchestrator {
       throw new CliError(EXIT.agent, `Orca 不支持 agent kind：${agent.kind}`);
     }
     const title = `${plan.stage.toUpperCase()} ${plan.story} r${plan.round}`;
-    const args = [
-      'orchestration',
-      'worker-start',
-      '--spec',
-      plan.prompt,
+    const args = ['orchestration', 'worker-start'];
+    if (plan.resume) {
+      args.push('--task', plan.resume.taskId);
+    } else {
+      args.push('--spec', plan.prompt);
+    }
+    args.push(
       '--worktree',
       this.worktree,
       '--agent',
@@ -250,13 +270,64 @@ export class OrcaAdapter implements Orchestrator {
       plan.runId,
       '--timeout-ms',
       String(plan.timeoutMs),
-    ];
+    );
     if (agent.model) args.push('--model', agent.model);
     if (agent.effort) args.push('--effort', agent.effort);
     if (agent.args?.length) args.push(...agent.args);
     args.push('--json');
     const json = this.run(args, plan.timeoutMs + 60_000);
     return extractDispatchHandle(json, plan.runId);
+  }
+
+  async inspect(handle: DispatchHandle): Promise<PendingInspection> {
+    if (!handle.taskId && !handle.dispatchId) {
+      return { state: 'unknown', reason: '派发句柄缺少 task/dispatch id' };
+    }
+    try {
+      const json = this.run(['orchestration', 'worker-list', '--run', handle.runId, '--json']);
+      const row = extractWorkers(json).find(
+        (worker) =>
+          (handle.dispatchId !== undefined && worker.dispatchId === handle.dispatchId) ||
+          (handle.taskId !== undefined && worker.taskId === handle.taskId),
+      );
+      if (!row) return { state: 'unknown', reason: 'worker-list 未返回该派发' };
+
+      const projection = asObject(row.projection);
+      const liveness = asObject(projection?.liveness);
+      const stage = asObject(projection?.stage);
+      const verdict = typeof liveness?.verdict === 'string' ? liveness.verdict : undefined;
+      const workerState = typeof row.workerState === 'string' ? row.workerState : undefined;
+      const dispatchStatus = typeof row.dispatchStatus === 'string' ? row.dispatchStatus : undefined;
+      const detail = typeof stage?.detail === 'string' ? stage.detail : undefined;
+      const label = [workerState, dispatchStatus, detail].filter(Boolean).join('/');
+
+      if (verdict === 'live') return { state: 'running' };
+      if (verdict !== 'exited') {
+        return { state: 'unknown', reason: label || `liveness=${verdict ?? 'unknown'}` };
+      }
+      if (!handle.taskId) return { state: 'unknown', reason: label || '进程已退出但缺少 task id' };
+
+      const taskStatus = extractTaskStatus(
+        this.run(['orchestration', 'task-list', '--run', handle.runId, '--json']),
+        handle.taskId,
+      );
+      if (!taskStatus) return { state: 'unknown', reason: label || '无法确认 task 状态' };
+      if (taskStatus === 'ready') {
+        // 手动停止或关窗后 Task 仍是 ready；worker_done 一定会先结算 Task，
+        // 因此 ready 证明这次派发没有产出结果，可以重开同一任务。
+        return {
+          state: 'lost',
+          reason: `${label || '进程已退出'}（task ${taskStatus}）`,
+          resume: { taskId: handle.taskId },
+        };
+      }
+      if (taskStatus === 'completed' || taskStatus === 'failed' || taskStatus === 'blocked' || taskStatus === 'cancelled') {
+        return { state: 'completed', reason: `${label || '进程已退出'}（task ${taskStatus}）` };
+      }
+      return { state: 'unknown', reason: `${label || '进程已退出'}（task ${taskStatus}）` };
+    } catch (error) {
+      return { state: 'unknown', reason: (error as Error).message };
+    }
   }
 
   async wait(handle: DispatchHandle, options: WaitOptions): Promise<DispatchResult> {

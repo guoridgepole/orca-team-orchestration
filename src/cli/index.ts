@@ -934,7 +934,7 @@ async function cmdExplain(args: ParsedArgs): Promise<number> {
       const roles = stageRoles(config, next);
       reasons.push(`下一步是 ${next} 阶段（第 ${round}/${limit} 轮），角色：${roles.join(', ') || '(无)'}`);
       if (state.pending) {
-        reasons.push(`存在未完成派发：${state.pending.stage}/${state.pending.role} r${state.pending.round}，resume 会继续等待而不是重新派发`);
+        reasons.push(`存在未完成派发：${state.pending.stage}/${state.pending.role} r${state.pending.round}，resume 会继续等待；若派发已退出则自动重新派发`);
       }
       const issues = state.pending ? [] : artifactIssues(root, config, next, story, round);
       for (const issue of issues) reasons.push(`待补齐：${issue.message}`);

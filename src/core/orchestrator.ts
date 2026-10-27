@@ -2,6 +2,10 @@ import type { AgentConfig } from './config.js';
 
 export type Outcome = 'succeeded' | 'failed' | 'blocked' | 'timeout';
 
+export interface DispatchResume {
+  taskId: string;
+}
+
 export interface DispatchPlan {
   runId: string;
   story: string;
@@ -12,6 +16,7 @@ export interface DispatchPlan {
   prompt: string;
   worktree: string;
   timeoutMs: number;
+  resume?: DispatchResume;
 }
 
 export interface DispatchHandle {
@@ -49,12 +54,21 @@ export interface GateRequest {
   options: string[];
 }
 
+export type PendingState = 'running' | 'completed' | 'lost' | 'unknown';
+
+export interface PendingInspection {
+  state: PendingState;
+  reason?: string;
+  resume?: DispatchResume;
+}
+
 export interface Orchestrator {
   readonly name: 'orca';
   probe(): Promise<void>;
   createRun(objective: string): Promise<string>;
   useRun(runId: string): Promise<void>;
   dispatch(plan: DispatchPlan): Promise<DispatchHandle>;
+  inspect(handle: DispatchHandle): Promise<PendingInspection>;
   wait(handle: DispatchHandle, options: WaitOptions): Promise<DispatchResult>;
   reply(messageId: string, body: string): Promise<void>;
   createGate(request: GateRequest, runId: string): Promise<string | null>;
